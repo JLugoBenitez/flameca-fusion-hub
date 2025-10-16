@@ -1,0 +1,14 @@
+# Dockerfile para Edge Functions de Supabase
+FROM supabase/edge-runtime:v1.0.0
+
+# Establecer directorio de trabajo
+WORKDIR /app
+
+# Copiar funciones
+COPY supabase/functions ./functions
+
+# Exponer puerto
+EXPOSE 8081
+
+# Comando por defecto
+CMD ["supabase", "functions", "serve", "--no-verify-jwt", "--env-file", ".env"]

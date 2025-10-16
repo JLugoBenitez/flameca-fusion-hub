@@ -1,0 +1,55 @@
+project_id = "nfkmvzwyllixmiugtaim"
+
+[functions.sync-woocommerce-products]
+verify_jwt = false
+
+[functions.sync-woocommerce-orders]
+verify_jwt = false
+
+[functions.assign-role]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.update-user]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.reset-password]
+verify_jwt = false
+
+[functions.change-password]
+verify_jwt = false
+
+[functions.send-sms]
+verify_jwt = false
+
+[functions.send-whatsapp]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.auto-notify]
+verify_jwt = false
+
+[functions.setup-admin-notifications]
+verify_jwt = false
+
+[functions.create-time-entry]
+verify_jwt = false
+
+[functions.webhook-woocommerce]
+verify_jwt = false
+
+[functions.create-holded-invoice]
+verify_jwt = false
+
+[functions.sync-woocommerce-holded]
+verify_jwt = false

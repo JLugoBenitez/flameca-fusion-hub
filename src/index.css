@@ -1,0 +1,387 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+:root {
+    /* Flamenco color palette */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 5%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 5%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 5%;
+
+    /* Rojo flamenco - passionate red */
+    --primary: 348 83% 47%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 348 83% 60%;
+    --primary-dark: 348 83% 35%;
+
+    /* Negro elegante con toque cálido */
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+
+    /* Dorado/oro para acentos */
+    --accent: 43 74% 66%;
+    --accent-foreground: 0 0% 13%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 348 83% 47%;
+
+    --radius: 0.75rem;
+
+    /* Gradientes flamencos */
+    --gradient-hero: linear-gradient(135deg, hsl(348 83% 47%), hsl(348 83% 35%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 98%));
+    --gradient-accent: linear-gradient(135deg, hsl(43 74% 66%), hsl(38 92% 50%));
+
+    /* Sombras elegantes */
+    --shadow-sm: 0 2px 8px hsla(348, 83%, 47%, 0.1);
+    --shadow-md: 0 4px 16px hsla(348, 83%, 47%, 0.15);
+    --shadow-lg: 0 8px 32px hsla(348, 83%, 47%, 0.2);
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 13%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 348 83% 47%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 20%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 348 83% 47%;
+
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 13%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 13%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 348 83% 47%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 348 83% 60%;
+    --primary-dark: 348 83% 35%;
+
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 43 74% 66%;
+    --accent-foreground: 0 0% 13%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 348 83% 47%;
+
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 348 83% 47%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 348 83% 47%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Selection styles */
+  ::selection {
+    @apply bg-primary/20 text-foreground;
+  }
+  
+  /* Better selection for light theme */
+  .light ::selection {
+    @apply bg-primary/30 text-foreground;
+  }
+  
+  /* Better selection for dark theme */
+  .dark ::selection {
+    @apply bg-primary/20 text-foreground;
+  }
+}
+
+@layer components {
+  /* Gradient utilities */
+  .bg-gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .bg-gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .bg-gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  /* Shadow utilities */
+  .shadow-flamenco-sm {
+    box-shadow: var(--shadow-sm);
+  }
+
+  .shadow-flamenco-md {
+    box-shadow: var(--shadow-md);
+  }
+
+  .shadow-flamenco-lg {
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  /* Loading states */
+  .loading-shimmer {
+    background: linear-gradient(90deg, 
+      hsl(var(--muted)) 25%, 
+      hsl(var(--muted-foreground) / 0.1) 50%, 
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Card hover effects */
+  .card-hover {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  .card-hover:hover {
+    @apply shadow-flamenco-md -translate-y-1;
+  }
+
+  /* Button variants */
+  .btn-flamenco {
+    @apply bg-gradient-hero text-primary-foreground hover:opacity-90 transition-opacity;
+  }
+
+  .btn-flamenco-outline {
+    @apply border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors;
+  }
+  
+  /* Ensure buttons are visible in both themes */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 border-primary;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 border-secondary;
+  }
+  
+  /* Fix button visibility in light theme */
+  .light .btn-primary {
+    @apply bg-primary text-white hover:bg-primary/90;
+  }
+  
+  .light .btn-secondary {
+    @apply bg-gray-100 text-gray-900 hover:bg-gray-200 border-gray-300;
+  }
+  
+  /* Dynamic sidebar colors */
+  .sidebar-brand {
+    @apply text-primary font-bold;
+  }
+  
+  .sidebar-user {
+    @apply text-primary-foreground;
+  }
+  
+  .sidebar-menu-item {
+    @apply text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors;
+  }
+  
+  .sidebar-menu-item.active {
+    @apply text-primary bg-primary/10;
+  }
+  
+  /* Dynamic hover effects */
+  .hover-primary {
+    @apply hover:bg-primary/10 hover:text-primary transition-colors;
+  }
+  
+  .hover-primary-strong {
+    @apply hover:bg-primary/20 hover:text-primary transition-colors;
+  }
+  
+  /* Dynamic borders */
+  .border-primary-subtle {
+    @apply border-primary/20 hover:border-primary/40 transition-colors;
+  }
+  
+  /* Dynamic backgrounds */
+  .bg-primary-subtle {
+    @apply bg-primary/5;
+  }
+  
+  .bg-primary-soft {
+    @apply bg-primary/10;
+  }
+}
+
+@layer utilities {
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Layout utilities */
+  .container-padding {
+    @apply px-4 md:px-6 lg:px-8;
+  }
+
+  .section-spacing {
+    @apply py-6 md:py-8 lg:py-12;
+  }
+
+  /* Responsive utilities */
+  .responsive-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6;
+  }
+
+  .responsive-text {
+    @apply text-sm md:text-base lg:text-lg;
+  }
+
+  /* Status indicators */
+  .status-online {
+    @apply bg-green-500;
+  }
+
+  .status-offline {
+    @apply bg-gray-400;
+  }
+
+  .status-busy {
+    @apply bg-red-500;
+  }
+
+  .status-away {
+    @apply bg-yellow-500;
+  }
+}
+
+/* Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-before: always;
+  }
+}
