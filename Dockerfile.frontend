@@ -2,7 +2,7 @@
 FROM node:18-alpine
 
 # Instalar dependencias del sistema
-RUN apk add --no-cache git curl
+RUN apk add --no-cache git curl python3 make g++
 
 # Establecer directorio de trabajo
 WORKDIR /app
@@ -11,7 +11,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instalar dependencias (incluyendo devDependencies para desarrollo)
-RUN npm ci
+# Usar npm install en lugar de npm ci para evitar problemas con @swc/core
+RUN npm install
 
 # Copiar código fuente
 COPY . .
