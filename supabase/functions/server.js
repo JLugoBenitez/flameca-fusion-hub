@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 8081;
-const FUNCTIONS_DIR = path.join(__dirname, 'functions');
+const FUNCTIONS_DIR = __dirname;
 
 // Función para cargar una Edge Function
 function loadFunction(functionName) {
