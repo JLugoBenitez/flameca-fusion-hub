@@ -25,9 +25,9 @@ USER nextjs
 # Exponer puerto
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+# Health check más permisivo para desarrollo
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
   CMD curl -f http://localhost:3000 || exit 1
 
-# Comando por defecto
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Comando por defecto con más opciones para desarrollo
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]

@@ -37,7 +37,7 @@ print_error() {
 wait_for_service() {
     local service_name=$1
     local check_command=$2
-    local max_attempts=30
+    local max_attempts=60  # Aumentado para frontend
     local attempt=1
     
     print_status "Esperando a que $service_name esté listo..."
@@ -48,13 +48,21 @@ wait_for_service() {
             return 0
         fi
         
-        echo -n "."
-        sleep 2
+        # Mostrar progreso cada 10 intentos
+        if [ $((attempt % 10)) -eq 0 ]; then
+            echo ""
+            print_status "Aún esperando... (intento $attempt/$max_attempts)"
+        else
+            echo -n "."
+        fi
+        
+        sleep 3  # Aumentado a 3 segundos
         attempt=$((attempt + 1))
     done
     
     echo ""
     print_error "$service_name no está disponible después de $max_attempts intentos"
+    print_warning "Puedes verificar los logs con: docker-compose logs $service_name"
     return 1
 }
 
@@ -213,7 +221,8 @@ start_services() {
     print_status "Iniciando Frontend..."
     docker-compose up -d frontend
     
-    # Esperar a que Frontend esté listo
+    # Esperar a que Frontend esté listo (con timeout más largo)
+    print_status "Frontend puede tardar varios minutos en compilar..."
     wait_for_service "Frontend" "curl -s http://localhost:3000"
     
     print_success "Todos los servicios están funcionando"
@@ -236,6 +245,7 @@ check_services() {
         print_success "Frontend está funcionando en http://localhost:3000"
     else
         print_warning "Frontend aún no está disponible (puede tardar unos minutos)"
+        print_status "Para ver logs del frontend: docker-compose logs frontend"
     fi
     
     # Verificar Edge Functions
