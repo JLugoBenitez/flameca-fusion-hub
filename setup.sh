@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ===========================================
-# FLAMENCO FUSIÓN HUB - SCRIPT DE SETUP
+# STORE MANAGEMENT APP - SCRIPT DE SETUP
 # ===========================================
 
 set -e  # Salir si hay algún error
 
-echo "🎭 FLAMENCO FUSIÓN HUB - SETUP AUTOMÁTICO"
+echo "🏪 STORE MANAGEMENT APP - SETUP AUTOMÁTICO"
 echo "=========================================="
 
 # Colores para output
@@ -33,9 +33,35 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Verificar si Docker está instalado
+# Función para esperar con timeout
+wait_for_service() {
+    local service_name=$1
+    local check_command=$2
+    local max_attempts=30
+    local attempt=1
+    
+    print_status "Esperando a que $service_name esté listo..."
+    
+    while [ $attempt -le $max_attempts ]; do
+        if eval "$check_command" > /dev/null 2>&1; then
+            print_success "$service_name está listo"
+            return 0
+        fi
+        
+        echo -n "."
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    echo ""
+    print_error "$service_name no está disponible después de $max_attempts intentos"
+    return 1
+}
+
+# Verificar si Docker está instalado y funcionando
 check_docker() {
     print_status "Verificando Docker..."
+    
     if ! command -v docker &> /dev/null; then
         print_error "Docker no está instalado. Por favor, instala Docker primero:"
         echo "  - macOS: https://docs.docker.com/desktop/mac/install/"
@@ -49,21 +75,39 @@ check_docker() {
         exit 1
     fi
     
-    print_success "Docker y Docker Compose están instalados"
-}
-
-# Verificar si Node.js está instalado
-check_node() {
-    print_status "Verificando Node.js..."
-    if ! command -v node &> /dev/null; then
-        print_warning "Node.js no está instalado. Se instalará automáticamente en el contenedor."
-    else
-        NODE_VERSION=$(node --version)
-        print_success "Node.js $NODE_VERSION está instalado"
+    # Verificar que Docker esté funcionando
+    if ! docker info > /dev/null 2>&1; then
+        print_error "Docker no está funcionando. Por favor, inicia Docker Desktop o el servicio Docker."
+        exit 1
     fi
+    
+    print_success "Docker y Docker Compose están instalados y funcionando"
 }
 
-# Crear archivo .env si no existe
+# Verificar archivos necesarios
+check_required_files() {
+    print_status "Verificando archivos necesarios..."
+    
+    local required_files=(
+        "package.json"
+        "docker-compose.yml"
+        "Dockerfile.frontend"
+        "Dockerfile.functions"
+        ".env.example"
+        "supabase/functions/.env.example"
+    )
+    
+    for file in "${required_files[@]}"; do
+        if [ ! -f "$file" ]; then
+            print_error "Archivo requerido no encontrado: $file"
+            exit 1
+        fi
+    done
+    
+    print_success "Todos los archivos necesarios están presentes"
+}
+
+# Crear archivos .env
 setup_env() {
     print_status "Configurando variables de entorno..."
     
@@ -96,7 +140,7 @@ setup_env() {
     fi
 }
 
-# Crear directorio SSL si no existe
+# Crear directorio SSL y certificados
 setup_ssl() {
     print_status "Configurando SSL..."
     
@@ -105,34 +149,74 @@ setup_ssl() {
         print_success "Directorio SSL creado"
     fi
     
+    # Verificar si OpenSSL está disponible
+    if ! command -v openssl &> /dev/null; then
+        print_warning "OpenSSL no está instalado. Saltando generación de certificados SSL."
+        print_warning "Los certificados se generarán automáticamente en el contenedor si es necesario."
+        return 0
+    fi
+    
     # Crear certificados autofirmados para desarrollo
     if [ ! -f ssl/cert.pem ] || [ ! -f ssl/key.pem ]; then
         print_status "Generando certificados SSL autofirmados para desarrollo..."
-        openssl req -x509 -newkey rsa:4096 -keyout ssl/key.pem -out ssl/cert.pem -days 365 -nodes -subj "/C=ES/ST=Madrid/L=Madrid/O=Flamenco/OU=IT/CN=localhost"
+        openssl req -x509 -newkey rsa:4096 -keyout ssl/key.pem -out ssl/cert.pem -days 365 -nodes -subj "/C=ES/ST=Madrid/L=Madrid/O=Store/OU=IT/CN=localhost" 2>/dev/null || {
+            print_warning "No se pudieron generar certificados SSL. Se usarán certificados por defecto."
+        }
         print_success "Certificados SSL generados"
     else
         print_success "Certificados SSL ya existen"
     fi
 }
 
-# Construir y levantar los servicios
+# Limpiar instalaciones anteriores
+cleanup_previous() {
+    print_status "Limpiando instalaciones anteriores..."
+    
+    # Parar contenedores existentes
+    docker-compose down -v 2>/dev/null || true
+    
+    # Limpiar volúmenes huérfanos
+    docker volume prune -f 2>/dev/null || true
+    
+    print_success "Limpieza completada"
+}
+
+# Construir imágenes Docker
+build_images() {
+    print_status "Construyendo imágenes Docker..."
+    
+    # Construir imágenes sin cache para asegurar que estén actualizadas
+    docker-compose build --no-cache
+    
+    print_success "Imágenes Docker construidas correctamente"
+}
+
+# Levantar servicios paso a paso
 start_services() {
-    print_status "Construyendo y levantando servicios..."
+    print_status "Levantando servicios..."
     
-    # Construir imágenes
-    docker-compose build
-    
-    # Levantar servicios básicos
+    # 1. Levantar PostgreSQL primero
+    print_status "Iniciando PostgreSQL..."
     docker-compose up -d postgres
     
     # Esperar a que PostgreSQL esté listo
-    print_status "Esperando a que PostgreSQL esté listo..."
-    sleep 10
+    wait_for_service "PostgreSQL" "docker-compose exec postgres pg_isready -U postgres"
     
-    # Levantar el resto de servicios
-    docker-compose up -d
+    # 2. Levantar Edge Functions
+    print_status "Iniciando Edge Functions..."
+    docker-compose up -d edge-functions
     
-    print_success "Servicios levantados correctamente"
+    # Esperar a que Edge Functions estén listas
+    wait_for_service "Edge Functions" "curl -s http://localhost:8081/health || curl -s http://localhost:8081"
+    
+    # 3. Levantar Frontend
+    print_status "Iniciando Frontend..."
+    docker-compose up -d frontend
+    
+    # Esperar a que Frontend esté listo
+    wait_for_service "Frontend" "curl -s http://localhost:3000"
+    
+    print_success "Todos los servicios están funcionando"
 }
 
 # Verificar que los servicios estén funcionando
@@ -144,7 +228,7 @@ check_services() {
         print_success "PostgreSQL está funcionando"
     else
         print_error "PostgreSQL no está funcionando"
-        exit 1
+        return 1
     fi
     
     # Verificar Frontend
@@ -160,6 +244,8 @@ check_services() {
     else
         print_warning "Edge Functions aún no están disponibles (puede tardar unos minutos)"
     fi
+    
+    return 0
 }
 
 # Mostrar información de acceso
@@ -182,17 +268,21 @@ show_access_info() {
     echo "📚 Documentación:"
     echo "  - README.md: Instrucciones detalladas"
     echo "  - DOCUMENTACION_COMPLETA.md: Documentación técnica"
+    echo "  - DOCKER_SETUP.md: Guía de Docker"
     echo ""
     echo "⚠️  IMPORTANTE:"
     echo "  - Edita el archivo .env con tus credenciales reales"
+    echo "  - Edita el archivo supabase/functions/.env con tus credenciales reales"
     echo "  - Configura las APIs (WooCommerce, Holded, Twilio, Resend)"
-    echo "  - Para producción, usa perfiles específicos de Docker Compose"
+    echo ""
+    echo "🔍 Para ver logs en tiempo real:"
+    echo "  docker-compose logs -f"
     echo ""
 }
 
 # Función para mostrar ayuda
 show_help() {
-    echo "🎭 FLAMENCO FUSIÓN HUB - SCRIPT DE SETUP"
+    echo "🏪 STORE MANAGEMENT APP - SCRIPT DE SETUP"
     echo "=========================================="
     echo ""
     echo "Uso: $0 [OPCIÓN]"
@@ -204,6 +294,7 @@ show_help() {
     echo "  -c, --clean    Limpiar y reinstalar todo"
     echo "  -s, --stop     Parar todos los servicios"
     echo "  -l, --logs     Mostrar logs de todos los servicios"
+    echo "  -r, --restart  Reiniciar todos los servicios"
     echo ""
     echo "Ejemplos:"
     echo "  $0              # Setup de desarrollo"
@@ -211,6 +302,7 @@ show_help() {
     echo "  $0 --clean      # Limpiar e instalar"
     echo "  $0 --stop       # Parar servicios"
     echo "  $0 --logs       # Ver logs"
+    echo "  $0 --restart    # Reiniciar servicios"
 }
 
 # Función para limpiar todo
@@ -218,13 +310,13 @@ clean_setup() {
     print_status "Limpiando instalación anterior..."
     
     # Parar servicios
-    docker-compose down -v
+    docker-compose down -v 2>/dev/null || true
     
     # Eliminar imágenes
-    docker-compose down --rmi all
+    docker-compose down --rmi all 2>/dev/null || true
     
     # Limpiar sistema Docker
-    docker system prune -f
+    docker system prune -f 2>/dev/null || true
     
     print_success "Limpieza completada"
 }
@@ -242,6 +334,13 @@ show_logs() {
     docker-compose logs -f
 }
 
+# Función para reiniciar servicios
+restart_services() {
+    print_status "Reiniciando servicios..."
+    docker-compose restart
+    print_success "Servicios reiniciados"
+}
+
 # Función para setup de producción
 setup_production() {
     print_status "Configurando para producción..."
@@ -256,8 +355,11 @@ setup_production() {
     export COMPOSE_FILE=docker-compose.prod.yml
     
     check_docker
+    check_required_files
     setup_env
     setup_ssl
+    cleanup_previous
+    build_images
     start_services
     check_services
     
@@ -287,9 +389,11 @@ main() {
             echo "Iniciando setup de desarrollo..."
             echo ""
             check_docker
-            check_node
+            check_required_files
             setup_env
             setup_ssl
+            cleanup_previous
+            build_images
             start_services
             check_services
             show_access_info
@@ -308,6 +412,9 @@ main() {
             ;;
         -l|--logs)
             show_logs
+            ;;
+        -r|--restart)
+            restart_services
             ;;
         *)
             print_error "Opción desconocida: $1"

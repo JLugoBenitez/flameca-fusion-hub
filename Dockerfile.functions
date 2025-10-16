@@ -1,5 +1,11 @@
 # Dockerfile para Edge Functions de Supabase
-FROM supabase/edge-runtime:v1.0.0
+FROM node:18-alpine
+
+# Instalar dependencias del sistema
+RUN apk add --no-cache curl
+
+# Instalar Supabase CLI
+RUN npm install -g supabase
 
 # Establecer directorio de trabajo
 WORKDIR /app
@@ -7,8 +13,18 @@ WORKDIR /app
 # Copiar funciones
 COPY supabase/functions ./functions
 
+# Crear usuario no-root para seguridad
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S supabase -u 1001
+RUN chown -R supabase:nodejs /app
+USER supabase
+
 # Exponer puerto
 EXPOSE 8081
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8081 || exit 1
+
 # Comando por defecto
-CMD ["supabase", "functions", "serve", "--no-verify-jwt", "--env-file", ".env"]
+CMD ["supabase", "functions", "serve", "--no-verify-jwt", "--env-file", ".env", "--port", "8081"]

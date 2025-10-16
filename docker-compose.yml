@@ -4,7 +4,7 @@ services:
   # Base de datos PostgreSQL (para desarrollo local)
   postgres:
     image: postgres:15-alpine
-    container_name: flamenco-postgres
+    container_name: store-postgres
     environment:
       POSTGRES_DB: flamenco_fusion
       POSTGRES_USER: postgres
@@ -17,6 +17,12 @@ services:
     networks:
       - flamenco-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Supabase Local (opcional - para desarrollo completo)
   supabase:
@@ -43,13 +49,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: flamenco-frontend
+    container_name: store-frontend
     ports:
       - "3000:3000"
     environment:
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-http://localhost:54321}
       - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-      - VITE_APP_NAME=${VITE_APP_NAME:-Flamenco Fusión Hub}
+      - VITE_APP_NAME=${VITE_APP_NAME:-Store Management App}
       - VITE_APP_VERSION=${VITE_APP_VERSION:-1.0.0}
     volumes:
       - .:/app
@@ -57,16 +63,22 @@ services:
     networks:
       - flamenco-network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
-    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Edge Functions (Supabase Functions)
   edge-functions:
     build:
       context: .
       dockerfile: Dockerfile.functions
-    container_name: flamenco-functions
+    container_name: store-functions
     ports:
       - "8081:8081"
     environment:
@@ -82,15 +94,21 @@ services:
       - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
       - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
       - RESEND_API_KEY=${RESEND_API_KEY}
-      - FROM_EMAIL=${FROM_EMAIL:-noreply@flamenca.com}
+      - FROM_EMAIL=${FROM_EMAIL:-noreply@store.com}
     volumes:
       - ./supabase/functions:/app/functions
     networks:
       - flamenco-network
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
-    command: supabase functions serve --no-verify-jwt --env-file .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Nginx (Proxy reverso para producción)
   nginx:

@@ -1,8 +1,8 @@
-# Dockerfile para el frontend de Flamenco Fusión Hub
+# Dockerfile para el frontend de Store Management App
 FROM node:18-alpine
 
 # Instalar dependencias del sistema
-RUN apk add --no-cache git
+RUN apk add --no-cache git curl
 
 # Establecer directorio de trabajo
 WORKDIR /app
@@ -10,14 +10,24 @@ WORKDIR /app
 # Copiar archivos de dependencias
 COPY package*.json ./
 
-# Instalar dependencias
-RUN npm ci --only=production
+# Instalar dependencias (incluyendo devDependencies para desarrollo)
+RUN npm ci
 
 # Copiar código fuente
 COPY . .
 
+# Crear usuario no-root para seguridad
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
 # Exponer puerto
 EXPOSE 3000
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000 || exit 1
+
 # Comando por defecto
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
