@@ -31,4 +31,4 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
   CMD curl -f http://localhost:3000 || exit 1
 
 # Comando por defecto con más opciones para desarrollo
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000", "--clearScreen", "false"]

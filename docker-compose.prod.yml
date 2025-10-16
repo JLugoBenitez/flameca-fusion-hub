@@ -1,34 +1,39 @@
 version: '3.8'
 
 services:
-  # Aplicación Frontend (Producción)
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: flamenco-frontend-prod
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: store-postgres-prod
     environment:
-      - NODE_ENV=production
-      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-      - VITE_APP_NAME=${VITE_APP_NAME:-Flamenco Fusión Hub}
-      - VITE_APP_VERSION=${VITE_APP_VERSION:-1.0.0}
+      POSTGRES_DB: flamenco_fusion
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
     volumes:
-      - ./dist:/app/dist
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
     networks:
-      - flamenco-network
+      - store-network
     restart: unless-stopped
-    command: npm run preview
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-  # Edge Functions (Producción)
+  # Edge Functions
   edge-functions:
     build:
       context: .
       dockerfile: Dockerfile.functions
-    container_name: flamenco-functions-prod
+    container_name: store-functions-prod
+    ports:
+      - "8081:8081"
     environment:
-      - NODE_ENV=production
-      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL:-http://localhost:54321}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - WOOCOMMERCE_STORE_URL=${WOOCOMMERCE_STORE_URL}
@@ -40,47 +45,54 @@ services:
       - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
       - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
       - RESEND_API_KEY=${RESEND_API_KEY}
-      - FROM_EMAIL=${FROM_EMAIL}
+      - FROM_EMAIL=${FROM_EMAIL:-noreply@store.com}
     volumes:
       - ./supabase/functions:/app/functions
     networks:
-      - flamenco-network
+      - store-network
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
-    command: supabase functions serve --no-verify-jwt --env-file .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-  # Nginx (Proxy reverso para producción)
-  nginx:
-    image: nginx:alpine
-    container_name: flamenco-nginx-prod
+  # Frontend (construido para producción)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.prod
+    container_name: store-frontend-prod
     ports:
       - "80:80"
       - "443:443"
-    volumes:
-      - ./nginx.prod.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
-      - ./dist:/usr/share/nginx/html
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-http://localhost:54321}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - VITE_APP_NAME=${VITE_APP_NAME:-Store Management App}
+      - VITE_APP_VERSION=${VITE_APP_VERSION:-1.0.0}
     networks:
-      - flamenco-network
+      - store-network
     depends_on:
-      - frontend
-      - edge-functions
+      postgres:
+        condition: service_healthy
+      edge-functions:
+        condition: service_healthy
     restart: unless-stopped
-
-  # Redis (Cache para producción)
-  redis:
-    image: redis:7-alpine
-    container_name: flamenco-redis-prod
-    volumes:
-      - redis_data_prod:/data
-    networks:
-      - flamenco-network
-    restart: unless-stopped
-    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
-  redis_data_prod:
-    driver: local
+  postgres_data:
 
 networks:
-  flamenco-network:
+  store-network:
     driver: bridge
