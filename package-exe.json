@@ -1,0 +1,19 @@
+{
+  "name": "flamenco-fusion-hub-installer",
+  "version": "1.0.0",
+  "description": "Instalador automático para Flamenco Fusion Hub",
+  "main": "installer.js",
+  "scripts": {
+    "build": "pkg installer.js --targets node18-win-x64 --output flamenco-installer.exe"
+  },
+  "dependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [
+      "supabase/**/*",
+      "src/**/*",
+      "package.json"
+    ]
+  }
+}
