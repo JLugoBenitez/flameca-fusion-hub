@@ -2,12 +2,12 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-REM 🚀 SCRIPT DE INSTALACIÓN COMPLETA - FLAMENCO FUSION HUB (WINDOWS)
-REM Este script instala todo lo necesario y ejecuta la aplicación
+REM 🚀 SCRIPT DE INSTALACIÓN CON NPX - FLAMENCO FUSION HUB (WINDOWS)
+REM Este script usa npx para evitar problemas de instalación global
 
 echo.
 echo 🎭 ===============================================
-echo 🎭    FLAMENCO FUSION HUB - INSTALACIÓN COMPLETA
+echo 🎭    FLAMENCO FUSION HUB - INSTALACIÓN CON NPX
 echo 🎭 ===============================================
 echo.
 
@@ -62,35 +62,16 @@ if !NODE_MAJOR! LSS 18 (
 )
 echo ✅ Node.js !NODE_VERSION! está instalado
 
-REM PASO 3: Verificar Supabase CLI
+REM PASO 3: Verificar npx (viene con Node.js)
 echo.
-echo 🔄 PASO 3: Verificando Supabase CLI...
-supabase --version >nul 2>&1
+echo 🔄 PASO 3: Verificando npx...
+npx --version >nul 2>&1
 if errorlevel 1 (
-    echo ⚠️  Supabase CLI no está instalado.
-    echo.
-    echo 📋 OPCIONES DE INSTALACIÓN:
-    echo.
-    echo 1. Usar Chocolatey (recomendado):
-    echo    choco install supabase
-    echo.
-    echo 2. Usar Scoop:
-    echo    scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-    echo    scoop install supabase
-    echo.
-    echo 3. Descargar manualmente desde:
-    echo    https://github.com/supabase/cli/releases
-    echo.
-    echo 4. Usar npx (temporal):
-    echo    npx supabase@latest
-    echo.
-    echo ⚠️  Por favor instala Supabase CLI usando una de las opciones anteriores
-    echo ⚠️  y vuelve a ejecutar este script.
+    echo ❌ npx no está disponible. Actualiza Node.js.
     pause
     exit /b 1
-) else (
-    echo ✅ Supabase CLI ya está instalado
 )
+echo ✅ npx está disponible (usaremos npx supabase@latest)
 
 REM PASO 4: Crear archivo .env si no existe
 echo.
@@ -144,11 +125,11 @@ docker stop $(docker ps -q) >nul 2>&1
 docker rm $(docker ps -aq) >nul 2>&1
 echo ✅ Docker configurado
 
-REM PASO 7: Iniciar Supabase
+REM PASO 7: Iniciar Supabase con npx
 echo.
-echo 🔄 PASO 7: Iniciando Supabase...
-supabase stop >nul 2>&1
-supabase start >nul 2>&1
+echo 🔄 PASO 7: Iniciando Supabase con npx...
+npx supabase@latest stop >nul 2>&1
+npx supabase@latest start >nul 2>&1
 if errorlevel 1 (
     echo ❌ Error al iniciar Supabase
     pause
@@ -156,13 +137,13 @@ if errorlevel 1 (
 )
 echo ✅ Supabase iniciado correctamente
 
-REM PASO 8: Iniciar Edge Functions
+REM PASO 8: Iniciar Edge Functions con npx
 echo.
-echo 🔄 PASO 8: Iniciando Edge Functions...
-taskkill /f /im "supabase.exe" >nul 2>&1
+echo 🔄 PASO 8: Iniciando Edge Functions con npx...
+taskkill /f /im "node.exe" >nul 2>&1
 timeout /t 2 /nobreak >nul
 cd supabase\functions
-start /b supabase functions serve --no-verify-jwt --env-file .env >nul 2>&1
+start /b npx supabase@latest functions serve --no-verify-jwt --env-file .env >nul 2>&1
 cd ..\..
 timeout /t 3 /nobreak >nul
 echo ✅ Edge Functions iniciadas
@@ -186,7 +167,7 @@ echo ℹ️  Para iniciar la aplicación frontend:
 echo   npm run dev
 echo.
 echo ℹ️  Para parar todos los servicios:
-echo   stop-app.bat
+echo   stop-app-npx.bat
 echo.
 echo ⚠️  IMPORTANTE: Si quieres usar APIs externas ^(WooCommerce, Holded, etc.^),
 echo ⚠️  edita el archivo supabase\functions\.env con tus API keys reales.

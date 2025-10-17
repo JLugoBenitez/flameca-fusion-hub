@@ -9,9 +9,10 @@
 ### Pasos:
 1. Copia toda la carpeta del proyecto a tu PC
 2. Abre **Símbolo del sistema** o **PowerShell** en la carpeta del proyecto
-3. Ejecuta: `install-and-run.bat`
-4. Espera a que termine la instalación
-5. Ejecuta: `npm run dev`
+3. **OPCIÓN A**: Ejecuta: `install-and-run-npx.bat` (recomendado - usa npx)
+4. **OPCIÓN B**: Ejecuta: `install-and-run.bat` (requiere Supabase CLI instalado)
+5. Espera a que termine la instalación
+6. Ejecuta: `npm run dev`
 
 ## 📱 URLs de la Aplicación
 
@@ -45,6 +46,11 @@ stop-app.bat
 
 ## 🔧 Scripts Disponibles para Windows
 
+### Scripts con npx (recomendado):
+- `install-and-run-npx.bat` - Instalación completa usando npx
+- `stop-app-npx.bat` - Parar servicios (versión npx)
+
+### Scripts con Supabase CLI instalado:
 - `install-and-run.bat` - Instalación completa automática
 - `start-app-simple.bat` - Inicio rápido (si ya está instalado)
 - `stop-app.bat` - Parar todos los servicios
@@ -98,13 +104,19 @@ Si tienes problemas:
 ## 🔄 Comandos Rápidos
 
 ```cmd
-# Instalación completa
+# Instalación completa (recomendado)
+install-and-run-npx.bat
+
+# Instalación completa (requiere Supabase CLI)
 install-and-run.bat
 
 # Inicio rápido
 start-app-simple.bat
 
-# Parar servicios
+# Parar servicios (versión npx)
+stop-app-npx.bat
+
+# Parar servicios (versión CLI)
 stop-app.bat
 
 # Iniciar frontend
