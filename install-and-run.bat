@@ -144,10 +144,45 @@ echo ✅ Docker configurado
 REM PASO 7: Iniciar Supabase
 echo.
 echo 🔄 PASO 7: Iniciando Supabase...
+
+REM Verificar que Supabase CLI funciona
+echo 🔍 Verificando Supabase CLI...
+supabase --version
+if errorlevel 1 (
+    echo ❌ Error: Supabase CLI no responde
+    echo.
+    echo 💡 Soluciones:
+    echo 1. Reinicia la terminal
+    echo 2. Ejecuta: refreshenv
+    echo 3. Verifica instalación: scoop list supabase
+    pause
+    exit /b 1
+)
+
+REM Verificar Docker
+echo 🔍 Verificando Docker...
+docker ps >nul 2>&1
+if errorlevel 1 (
+    echo ❌ Error: Docker no está ejecutándose
+    echo.
+    echo 💡 Solución: Inicia Docker Desktop y vuelve a ejecutar
+    pause
+    exit /b 1
+)
+
+echo 🔄 Parando Supabase anterior...
 supabase stop >nul 2>&1
-supabase start >nul 2>&1
+
+echo 🔄 Iniciando Supabase...
+supabase start
 if errorlevel 1 (
     echo ❌ Error al iniciar Supabase
+    echo.
+    echo 💡 Posibles soluciones:
+    echo 1. Verifica que Docker esté ejecutándose
+    echo 2. Ejecuta: supabase stop
+    echo 3. Reinicia Docker Desktop
+    echo 4. Vuelve a ejecutar el script
     pause
     exit /b 1
 )
