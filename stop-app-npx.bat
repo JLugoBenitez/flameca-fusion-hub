@@ -17,7 +17,7 @@ echo ✅ Edge Functions detenidas
 
 REM Parar Supabase
 echo ℹ️  Deteniendo Supabase...
-npx supabase@latest stop >nul 2>&1
+npx supabase stop >nul 2>&1
 echo ✅ Supabase detenido
 
 REM Limpiar contenedores Docker

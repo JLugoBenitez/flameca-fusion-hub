@@ -25,16 +25,16 @@ echo ✅ Contenedores limpiados
 
 REM PASO 2: Iniciar Supabase
 echo 🔄 Iniciando Supabase...
-supabase stop >nul 2>&1
-supabase start >nul 2>&1
+npx supabase stop >nul 2>&1
+npx supabase start >nul 2>&1
 echo ✅ Supabase iniciado
 
 REM PASO 3: Iniciar Edge Functions en background
 echo 🔄 Iniciando Edge Functions...
-taskkill /f /im "supabase.exe" >nul 2>&1
+taskkill /f /im "node.exe" >nul 2>&1
 timeout /t 2 /nobreak >nul
 cd supabase\functions
-start /b supabase functions serve --no-verify-jwt --env-file .env >nul 2>&1
+start /b npx supabase functions serve --no-verify-jwt --env-file .env >nul 2>&1
 cd ..\..
 timeout /t 3 /nobreak >nul
 echo ✅ Edge Functions iniciadas

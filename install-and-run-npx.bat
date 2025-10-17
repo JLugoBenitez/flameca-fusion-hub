@@ -122,6 +122,17 @@ if errorlevel 1 (
 )
 echo ✅ Dependencias instaladas
 
+REM PASO 5.5: Instalar Supabase CLI localmente
+echo.
+echo 🔄 PASO 5.5: Instalando Supabase CLI localmente...
+npm install supabase --save-dev
+if errorlevel 1 (
+    echo ❌ Error al instalar Supabase CLI
+    pause
+    exit /b 1
+)
+echo ✅ Supabase CLI instalado localmente
+
 REM PASO 6: Limpiar y configurar Docker
 echo.
 echo 🔄 PASO 6: Configurando Docker...
