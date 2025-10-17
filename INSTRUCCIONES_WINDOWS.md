@@ -9,7 +9,14 @@
 
 ### Instalación de Supabase CLI (OBLIGATORIO):
 
-#### 🥄 **Opción 1: Scoop (Recomendada)**
+#### 📦 **Opción 1: npm (Recomendada - más fácil)**
+```cmd
+# En la carpeta del proyecto
+npm i supabase --save-dev
+```
+**Ventajas**: Se instala automáticamente con el script, no requiere configuración adicional.
+
+#### 🥄 **Opción 2: Scoop**
 ```powershell
 # Instalar Scoop
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
@@ -19,7 +26,7 @@ irm get.scoop.sh | iex
 scoop install supabase
 ```
 
-#### 🍫 **Opción 2: Chocolatey**
+#### 🍫 **Opción 3: Chocolatey**
 ```powershell
 # Instalar Chocolatey (como administrador)
 Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
@@ -28,7 +35,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManage
 choco install supabase
 ```
 
-#### 📥 **Opción 3: Descarga Manual**
+#### 📥 **Opción 4: Descarga Manual**
 1. Ve a: https://github.com/supabase/cli/releases
 2. Descarga la versión para Windows (supabase_windows_amd64.zip)
 3. Extrae el archivo `supabase.exe`

@@ -71,24 +71,35 @@ if errorlevel 1 (
     echo.
     echo 📋 OPCIONES PARA INSTALAR SUPABASE CLI:
     echo.
-    echo 1️⃣  OPCIÓN RECOMENDADA - Scoop (más fácil):
+    echo 1️⃣  OPCIÓN RECOMENDADA - npm (más fácil):
+    echo    - Ejecuta: npm i supabase --save-dev
+    echo    - Esto instala el CLI localmente en el proyecto
+    echo.
+    echo 2️⃣  OPCIÓN ALTERNATIVA - Scoop:
     echo    - Instala Scoop: https://scoop.sh/
     echo    - Ejecuta: scoop install supabase
     echo.
-    echo 2️⃣  OPCIÓN ALTERNATIVA - Chocolatey:
+    echo 3️⃣  OPCIÓN ALTERNATIVA - Chocolatey:
     echo    - Instala Chocolatey: https://chocolatey.org/
     echo    - Ejecuta: choco install supabase
     echo.
-    echo 3️⃣  OPCIÓN MANUAL - Descarga directa:
+    echo 4️⃣  OPCIÓN MANUAL - Descarga directa:
     echo    - Ve a: https://github.com/supabase/cli/releases
     echo    - Descarga la versión para Windows
     echo    - Extrae y añade al PATH
     echo.
-    echo ⚠️  IMPORTANTE: Instala Supabase CLI y vuelve a ejecutar este script.
-    pause
-    exit /b 1
+    echo 🔄 Intentando instalar con npm automáticamente...
+    call npm i supabase --save-dev
+    if errorlevel 1 (
+        echo ❌ Error al instalar Supabase CLI con npm
+        echo ⚠️  Instala Supabase CLI manualmente y vuelve a ejecutar este script.
+        pause
+        exit /b 1
+    )
+    echo ✅ Supabase CLI instalado con npm
+) else (
+    echo ✅ Supabase CLI ya está instalado
 )
-echo ✅ Supabase CLI ya está instalado
 
 REM PASO 4: Crear archivo .env si no existe
 echo.
@@ -135,6 +146,11 @@ if errorlevel 1 (
 )
 echo ✅ Dependencias instaladas
 
+REM Limpiar vulnerabilidades automáticamente
+echo 🔄 Limpiando vulnerabilidades de seguridad...
+call npm audit fix >nul 2>&1
+echo ✅ Vulnerabilidades limpiadas
+
 REM PASO 6: Limpiar y configurar Docker
 echo.
 echo 🔄 PASO 6: Configurando Docker...
@@ -145,8 +161,24 @@ echo ✅ Docker configurado
 REM PASO 7: Iniciar Supabase
 echo.
 echo 🔄 PASO 7: Iniciando Supabase...
-supabase stop >nul 2>&1
-supabase start >nul 2>&1
+
+REM Verificar si Supabase CLI está instalado globalmente o localmente
+supabase --version >nul 2>&1
+if not errorlevel 1 (
+    set SUPABASE_CMD=supabase
+) else (
+    npx supabase --version >nul 2>&1
+    if not errorlevel 1 (
+        set SUPABASE_CMD=npx supabase
+    ) else (
+        echo ❌ Supabase CLI no está disponible
+        pause
+        exit /b 1
+    )
+)
+
+%SUPABASE_CMD% stop >nul 2>&1
+%SUPABASE_CMD% start >nul 2>&1
 if errorlevel 1 (
     echo ❌ Error al iniciar Supabase
     pause
@@ -160,7 +192,7 @@ echo 🔄 PASO 8: Iniciando Edge Functions...
 taskkill /f /im "supabase.exe" >nul 2>&1
 timeout /t 2 /nobreak >nul
 cd supabase\functions
-start /b supabase functions serve --no-verify-jwt --env-file .env >nul 2>&1
+start /b %SUPABASE_CMD% functions serve --no-verify-jwt --env-file .env >nul 2>&1
 cd ..\..
 timeout /t 3 /nobreak >nul
 echo ✅ Edge Functions iniciadas
@@ -172,7 +204,7 @@ echo 🎉        ¡INSTALACIÓN COMPLETADA!
 echo 🎉 ===============================================
 echo.
 echo ℹ️  URLs disponibles:
-echo   🌐 Aplicación Frontend: http://localhost:5173
+echo   🌐 Aplicación Frontend: dirección proporcionada por npm run dev
 echo   🗄️  Supabase Studio: http://localhost:54323
 echo   🔌 API REST: http://localhost:54321
 echo   📧 Mailpit: http://localhost:54324

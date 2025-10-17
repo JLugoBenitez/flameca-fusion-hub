@@ -24,8 +24,24 @@ echo ✅ Contenedores limpiados
 
 REM PASO 2: Iniciar Supabase
 echo 🔄 Iniciando Supabase...
-supabase stop >nul 2>&1
-supabase start >nul 2>&1
+
+REM Verificar si Supabase CLI está instalado globalmente o localmente
+supabase --version >nul 2>&1
+if not errorlevel 1 (
+    set SUPABASE_CMD=supabase
+) else (
+    npx supabase --version >nul 2>&1
+    if not errorlevel 1 (
+        set SUPABASE_CMD=npx supabase
+    ) else (
+        echo ❌ Supabase CLI no está disponible
+        pause
+        exit /b 1
+    )
+)
+
+%SUPABASE_CMD% stop >nul 2>&1
+%SUPABASE_CMD% start >nul 2>&1
 echo ✅ Supabase iniciado
 
 REM PASO 3: Iniciar Edge Functions en background
@@ -33,7 +49,7 @@ echo 🔄 Iniciando Edge Functions...
 taskkill /f /im "supabase.exe" >nul 2>&1
 timeout /t 2 /nobreak >nul
 cd supabase\functions
-start /b supabase functions serve --no-verify-jwt --env-file .env >nul 2>&1
+start /b %SUPABASE_CMD% functions serve --no-verify-jwt --env-file .env >nul 2>&1
 cd ..\..
 timeout /t 3 /nobreak >nul
 echo ✅ Edge Functions iniciadas

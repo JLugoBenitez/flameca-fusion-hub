@@ -22,19 +22,50 @@ if not errorlevel 1 (
 
 echo ℹ️  Supabase CLI no está instalado. Selecciona un método de instalación:
 echo.
-echo 1️⃣  Scoop (Recomendado - más fácil)
-echo 2️⃣  Chocolatey
-echo 3️⃣  Descarga manual
-echo 4️⃣  Salir
+echo 1️⃣  npm (Recomendado - más fácil)
+echo 2️⃣  Scoop
+echo 3️⃣  Chocolatey
+echo 4️⃣  Descarga manual
+echo 5️⃣  Salir
 echo.
 
-set /p choice="Selecciona una opción (1-4): "
+set /p choice="Selecciona una opción (1-5): "
 
-if "%choice%"=="1" goto install_scoop
-if "%choice%"=="2" goto install_chocolatey
-if "%choice%"=="3" goto install_manual
-if "%choice%"=="4" goto exit
+if "%choice%"=="1" goto install_npm
+if "%choice%"=="2" goto install_scoop
+if "%choice%"=="3" goto install_chocolatey
+if "%choice%"=="4" goto install_manual
+if "%choice%"=="5" goto exit
 goto invalid_choice
+
+:install_npm
+echo.
+echo 🔄 Instalando Supabase CLI con npm...
+echo.
+
+REM Verificar si npm está disponible
+npm --version >nul 2>&1
+if errorlevel 1 (
+    echo ❌ npm no está disponible. Instala Node.js primero.
+    pause
+    exit /b 1
+)
+
+echo ✅ npm está disponible
+echo.
+echo 🔄 Instalando Supabase CLI como dependencia de desarrollo...
+npm i supabase --save-dev
+if errorlevel 1 (
+    echo ❌ Error al instalar Supabase CLI con npm
+    pause
+    exit /b 1
+)
+
+echo ✅ Supabase CLI instalado correctamente con npm
+echo.
+echo ℹ️  Nota: El CLI se instaló localmente en el proyecto.
+echo ℹ️  Para usarlo, ejecuta: npx supabase [comando]
+goto verify_installation
 
 :install_scoop
 echo.
