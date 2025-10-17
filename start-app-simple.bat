@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 
 REM 🚀 SCRIPT DE INICIO SIMPLE - FLAMENCO FUSION HUB (WINDOWS)
 REM Versión optimizada que no se congela
@@ -19,22 +18,22 @@ if not exist "package.json" (
 
 REM PASO 1: Limpiar contenedores existentes
 echo 🔄 Limpiando contenedores Docker...
-docker stop $(docker ps -q) >nul 2>&1
-docker rm $(docker ps -aq) >nul 2>&1
+for /f %%i in ('docker ps -q') do docker stop %%i >nul 2>&1
+for /f %%i in ('docker ps -aq') do docker rm %%i >nul 2>&1
 echo ✅ Contenedores limpiados
 
 REM PASO 2: Iniciar Supabase
 echo 🔄 Iniciando Supabase...
-npx supabase stop >nul 2>&1
-npx supabase start >nul 2>&1
+supabase stop >nul 2>&1
+supabase start >nul 2>&1
 echo ✅ Supabase iniciado
 
 REM PASO 3: Iniciar Edge Functions en background
 echo 🔄 Iniciando Edge Functions...
-taskkill /f /im "node.exe" >nul 2>&1
+taskkill /f /im "supabase.exe" >nul 2>&1
 timeout /t 2 /nobreak >nul
 cd supabase\functions
-start /b npx supabase functions serve --no-verify-jwt --env-file .env >nul 2>&1
+start /b supabase functions serve --no-verify-jwt --env-file .env >nul 2>&1
 cd ..\..
 timeout /t 3 /nobreak >nul
 echo ✅ Edge Functions iniciadas
@@ -55,7 +54,7 @@ echo ℹ️  Credenciales de prueba:
 echo   👤 Admin: admin@flamenca.com / admin123
 echo.
 
-REM PASO 5: Mostrar instrucciones
+REM PASO 5: Iniciar aplicación frontend
 echo 🔄 Iniciando aplicación frontend...
 echo.
 echo ℹ️  Para iniciar la aplicación frontend, ejecuta:

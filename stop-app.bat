@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 
 REM 🛑 SCRIPT DE PARADA - FLAMENCO FUSION HUB (WINDOWS)
 REM Este script detiene todos los servicios de la aplicación
@@ -22,8 +21,8 @@ echo ✅ Supabase detenido
 
 REM Limpiar contenedores Docker
 echo ℹ️  Limpiando contenedores Docker...
-docker stop $(docker ps -q) >nul 2>&1
-docker rm $(docker ps -aq) >nul 2>&1
+for /f %%i in ('docker ps -q') do docker stop %%i >nul 2>&1
+for /f %%i in ('docker ps -aq') do docker rm %%i >nul 2>&1
 echo ✅ Contenedores limpiados
 
 echo.

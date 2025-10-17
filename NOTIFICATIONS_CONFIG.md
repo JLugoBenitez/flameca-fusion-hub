@@ -12,7 +12,7 @@
 ### **1. 📱 TWILIO (SMS + WhatsApp)**
 ```bash
 # Variables de entorno necesarias en supabase/functions/.env
-TWILIO_ACCOUNT_SID=tu_account_sid_aqui
+TWILIO_ACCOUNT_SID=AC6b5934fd00114e36dd692776eccd998e
 TWILIO_AUTH_TOKEN=tu_token_aqui
 TWILIO_PHONE_NUMBER=+18146214272
 TWILIO_WHATSAPP_NUMBER=+14155238886

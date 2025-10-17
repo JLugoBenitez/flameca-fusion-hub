@@ -1,9 +1,8 @@
 @echo off
-chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 REM 🚀 SCRIPT DE INSTALACIÓN COMPLETA - FLAMENCO FUSION HUB (WINDOWS)
-REM Este script instala todo lo necesario y ejecuta la aplicación
+REM Este script instala todo lo necesario y ejecuta la aplicación en Windows
 
 echo.
 echo 🎭 ===============================================
@@ -54,6 +53,7 @@ if errorlevel 1 (
 
 for /f "tokens=1 delims=v" %%i in ('node --version') do set NODE_VERSION=%%i
 for /f "tokens=1 delims=." %%i in ("!NODE_VERSION!") do set NODE_MAJOR=%%i
+
 if !NODE_MAJOR! LSS 18 (
     echo ❌ Node.js versión !NODE_VERSION! detectada. Se requiere versión 18 o superior.
     echo ℹ️  Por favor actualiza Node.js desde: https://nodejs.org/
@@ -69,28 +69,26 @@ supabase --version >nul 2>&1
 if errorlevel 1 (
     echo ⚠️  Supabase CLI no está instalado.
     echo.
-    echo 📋 OPCIONES DE INSTALACIÓN:
+    echo 📋 OPCIONES PARA INSTALAR SUPABASE CLI:
     echo.
-    echo 1. Usar Chocolatey (recomendado):
-    echo    choco install supabase
+    echo 1️⃣  OPCIÓN RECOMENDADA - Scoop (más fácil):
+    echo    - Instala Scoop: https://scoop.sh/
+    echo    - Ejecuta: scoop install supabase
     echo.
-    echo 2. Usar Scoop:
-    echo    scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-    echo    scoop install supabase
+    echo 2️⃣  OPCIÓN ALTERNATIVA - Chocolatey:
+    echo    - Instala Chocolatey: https://chocolatey.org/
+    echo    - Ejecuta: choco install supabase
     echo.
-    echo 3. Descargar manualmente desde:
-    echo    https://github.com/supabase/cli/releases
+    echo 3️⃣  OPCIÓN MANUAL - Descarga directa:
+    echo    - Ve a: https://github.com/supabase/cli/releases
+    echo    - Descarga la versión para Windows
+    echo    - Extrae y añade al PATH
     echo.
-    echo 4. Usar npx (temporal):
-    echo    npx supabase@latest
-    echo.
-    echo ⚠️  Por favor instala Supabase CLI usando una de las opciones anteriores
-    echo ⚠️  y vuelve a ejecutar este script.
+    echo ⚠️  IMPORTANTE: Instala Supabase CLI y vuelve a ejecutar este script.
     pause
     exit /b 1
-) else (
-    echo ✅ Supabase CLI ya está instalado
 )
+echo ✅ Supabase CLI ya está instalado
 
 REM PASO 4: Crear archivo .env si no existe
 echo.
@@ -109,17 +107,17 @@ if not exist "supabase\functions\.env" (
         echo # Holded API
         echo HOLDED_API_KEY=tu_holded_api_key
         echo.
-        echo # Twilio ^(para SMS/WhatsApp^)
+        echo # Twilio (para SMS/WhatsApp)
         echo TWILIO_ACCOUNT_SID=tu_twilio_sid
         echo TWILIO_AUTH_TOKEN=tu_twilio_token
         echo TWILIO_PHONE_NUMBER=+1234567890
         echo.
-        echo # Email ^(opcional^)
+        echo # Email (opcional)
         echo SMTP_HOST=smtp.gmail.com
         echo SMTP_PORT=587
         echo SMTP_USER=tu_email@gmail.com
         echo SMTP_PASS=tu_password
-    ) > "supabase\functions\.env"
+    ) > supabase\functions\.env
     echo ✅ Archivo .env creado con valores de ejemplo
     echo ⚠️  IMPORTANTE: Edita supabase\functions\.env con tus API keys reales
 ) else (
@@ -129,7 +127,7 @@ if not exist "supabase\functions\.env" (
 REM PASO 5: Instalar dependencias
 echo.
 echo 🔄 PASO 5: Instalando dependencias de Node.js...
-npm install
+call npm install
 if errorlevel 1 (
     echo ❌ Error al instalar dependencias
     pause
@@ -140,8 +138,8 @@ echo ✅ Dependencias instaladas
 REM PASO 6: Limpiar y configurar Docker
 echo.
 echo 🔄 PASO 6: Configurando Docker...
-docker stop $(docker ps -q) >nul 2>&1
-docker rm $(docker ps -aq) >nul 2>&1
+for /f %%i in ('docker ps -q') do docker stop %%i >nul 2>&1
+for /f %%i in ('docker ps -aq') do docker rm %%i >nul 2>&1
 echo ✅ Docker configurado
 
 REM PASO 7: Iniciar Supabase
@@ -188,7 +186,7 @@ echo.
 echo ℹ️  Para parar todos los servicios:
 echo   stop-app.bat
 echo.
-echo ⚠️  IMPORTANTE: Si quieres usar APIs externas ^(WooCommerce, Holded, etc.^),
+echo ⚠️  IMPORTANTE: Si quieres usar APIs externas (WooCommerce, Holded, etc.),
 echo ⚠️  edita el archivo supabase\functions\.env con tus API keys reales.
 echo.
 echo ✅ ¡Instalación completada! Ejecuta 'npm run dev' para iniciar la aplicación.
