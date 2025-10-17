@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 REM 🚀 SCRIPT DE INSTALACIÓN COMPLETA - FLAMENCO FUSION HUB (WINDOWS)
 REM Este script instala todo lo necesario y ejecuta la aplicación
-REM Supabase CLI debe estar instalado previamente con Chocolatey
+REM Basado en install-and-run.sh que funciona perfectamente
 
 echo.
 echo 🎭 ===============================================
@@ -63,26 +63,17 @@ if !NODE_MAJOR! LSS 18 (
 )
 echo ✅ Node.js !NODE_VERSION! está instalado
 
-REM PASO 3: Verificar Supabase CLI (instalado con Chocolatey)
+REM PASO 3: Verificar Supabase CLI (ya instalado con Scoop)
 echo.
 echo 🔄 PASO 3: Verificando Supabase CLI...
 supabase --version >nul 2>&1
 if errorlevel 1 (
     echo ❌ Supabase CLI no está instalado.
-    echo.
-    echo 📋 INSTALACIÓN REQUERIDA:
-    echo.
-    echo 1️⃣  Instala Supabase CLI con Chocolatey:
-    echo    choco install supabase
-    echo.
-    echo 2️⃣  O instala con Scoop:
-    echo    scoop install supabase
-    echo.
-    echo ⚠️  IMPORTANTE: Instala Supabase CLI y vuelve a ejecutar este script.
+    echo ℹ️  Instala Supabase CLI con: scoop install supabase
     pause
     exit /b 1
 )
-echo ✅ Supabase CLI está instalado
+echo ✅ Supabase CLI ya está instalado
 
 REM PASO 4: Crear archivo .env si no existe
 echo.
@@ -129,11 +120,6 @@ if errorlevel 1 (
 )
 echo ✅ Dependencias instaladas
 
-REM Limpiar vulnerabilidades automáticamente
-echo 🔄 Limpiando vulnerabilidades de seguridad...
-call npm audit fix >nul 2>&1
-echo ✅ Vulnerabilidades limpiadas
-
 REM PASO 6: Limpiar y configurar Docker
 echo.
 echo 🔄 PASO 6: Configurando Docker...
@@ -144,45 +130,10 @@ echo ✅ Docker configurado
 REM PASO 7: Iniciar Supabase
 echo.
 echo 🔄 PASO 7: Iniciando Supabase...
-
-REM Verificar que Supabase CLI funciona
-echo 🔍 Verificando Supabase CLI...
-supabase --version
-if errorlevel 1 (
-    echo ❌ Error: Supabase CLI no responde
-    echo.
-    echo 💡 Soluciones:
-    echo 1. Reinicia la terminal
-    echo 2. Ejecuta: refreshenv
-    echo 3. Verifica instalación: scoop list supabase
-    pause
-    exit /b 1
-)
-
-REM Verificar Docker
-echo 🔍 Verificando Docker...
-docker ps >nul 2>&1
-if errorlevel 1 (
-    echo ❌ Error: Docker no está ejecutándose
-    echo.
-    echo 💡 Solución: Inicia Docker Desktop y vuelve a ejecutar
-    pause
-    exit /b 1
-)
-
-echo 🔄 Parando Supabase anterior...
 supabase stop >nul 2>&1
-
-echo 🔄 Iniciando Supabase...
-supabase start
+supabase start >nul 2>&1
 if errorlevel 1 (
     echo ❌ Error al iniciar Supabase
-    echo.
-    echo 💡 Posibles soluciones:
-    echo 1. Verifica que Docker esté ejecutándose
-    echo 2. Ejecuta: supabase stop
-    echo 3. Reinicia Docker Desktop
-    echo 4. Vuelve a ejecutar el script
     pause
     exit /b 1
 )
