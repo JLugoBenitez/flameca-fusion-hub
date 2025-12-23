@@ -92,9 +92,9 @@ npx supabase --version
 
 ### **Paso 4: Configurar Variables de Entorno**
 ```bash
-# Copiar archivos de configuración
-cp .env.example .env
-cp supabase/functions/.env.example supabase/functions/.env
+# Copiar archivos de configuración (ejemplo cloud)
+cp env.example .env
+cp supabase/functions/env.example supabase/functions/.env
 
 # Editar configuración principal
 nano .env
@@ -193,9 +193,9 @@ npx supabase --version
 
 ### **Paso 4: Configurar Variables de Entorno**
 ```powershell
-# Copiar archivos de configuración
-copy .env.example .env
-copy supabase\functions\.env.example supabase\functions\.env
+# Copiar archivos de configuración (ejemplo cloud)
+copy env.example .env
+copy supabase\functions\env.example supabase\functions\.env
 
 # Editar configuración (usar tu editor preferido)
 notepad .env

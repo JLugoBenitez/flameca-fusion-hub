@@ -77,9 +77,9 @@ cd flamenco-fusion-hub
 # 2. Instalar dependencias
 npm install
 
-# 3. Configurar variables de entorno
-cp .env.example .env
-cp supabase/functions/.env.example supabase/functions/.env
+# 3. Configurar variables de entorno (ejemplo para Supabase Cloud)
+cp env.example .env
+cp supabase/functions/env.example supabase/functions/.env
 
 # 4. Editar archivos .env con tus credenciales
 # - .env (variables del frontend)
@@ -104,6 +104,19 @@ cp supabase/functions/.env.example supabase/functions/.env
 **Archivos a configurar:**
 - **`.env`** (raíz del proyecto): Variables del frontend
 - **`supabase/functions/.env`**: Variables para Edge Functions
+
+### **Supabase Cloud (desplegar en la nube)**
+1. Crea un proyecto en [app.supabase.com](https://app.supabase.com) y guarda:
+   - URL del proyecto (`https://<project-ref>.supabase.co`)
+   - Clave `anon` (publishable)
+   - Clave `service_role`
+2. Instala el CLI y autentica: `npm i -g supabase` y `supabase login`.
+3. Enlaza el proyecto: `supabase link --project-ref <project-ref>`.
+4. Aplica el esquema: `supabase db push` (usa las migraciones de `supabase/migrations`).
+5. Sube las funciones Edge:
+   - Exporta secretos: `supabase secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... WOOCOMMERCE_STORE_URL=... WOOCOMMERCE_CONSUMER_KEY=... WOOCOMMERCE_CONSUMER_SECRET=... HOLDED_API_KEY=... [TWILIO_* opcional] [RESEND_API_KEY FROM_EMAIL opcional]`
+   - Despliega: `supabase functions deploy --project-ref <project-ref> --no-verify-jwt assign-role auto-notify change-password create-holded-invoice create-time-entry create-user delete-user holded-documents reset-password send-email send-notification send-sms send-whatsapp setup-admin-notifications sync-woocommerce-holded sync-woocommerce-orders sync-woocommerce-products`
+6. Actualiza el frontend con los valores cloud en `.env`.
 
 ---
 

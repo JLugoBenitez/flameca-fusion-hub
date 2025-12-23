@@ -2,17 +2,21 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Use proxy in development, direct URL in production
-const SUPABASE_URL = import.meta.env.DEV 
-  ? `${window.location.origin}/api` // Use proxy in development with full URL
-  : import.meta.env.VITE_SUPABASE_URL; // Direct URL in production
+// Prefer the explicit cloud URL; fall back to the local proxy only if it is unset.
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || `${window.location.origin}/api`;
 
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Use the anon/publishable key from the Supabase proyecto en la nube.
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.warn('[Supabase] Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY en las variables de entorno.');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,

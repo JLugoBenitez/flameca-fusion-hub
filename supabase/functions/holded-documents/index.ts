@@ -181,8 +181,8 @@ serve(async (req) => {
 // Listar documentos
 async function listDocuments(apiKey: string, params: any, isTestMode: boolean) {
   // Crear cliente de Supabase
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabaseUrl = Deno.env.get('SB_URL')!
+  const supabaseKey = Deno.env.get('SB_SERVICE_ROLE_KEY')!
   const supabase = createClient(supabaseUrl, supabaseKey)
   
   if (isTestMode) {
@@ -330,8 +330,8 @@ async function createDocument(apiKey: string, params: any, isTestMode: boolean) 
   const document: HoldedDocument = params.document
   
   // Crear cliente de Supabase
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const supabaseUrl = Deno.env.get('SB_URL')!
+  const supabaseKey = Deno.env.get('SB_SERVICE_ROLE_KEY')!
   const supabase = createClient(supabaseUrl, supabaseKey)
   
   if (isTestMode) {
@@ -604,8 +604,8 @@ async function getDocumentPDF(apiKey: string, params: any, isTestMode: boolean) 
   try {
     // Obtener los datos del documento desde nuestra base de datos local
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SB_URL') ?? '',
+      Deno.env.get('SB_SERVICE_ROLE_KEY') ?? ''
     )
     
     const { data: documentData, error: dbError } = await supabase

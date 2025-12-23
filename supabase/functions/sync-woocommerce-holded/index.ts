@@ -48,8 +48,8 @@ serve(async (req) => {
     }
 
     // Crear cliente de Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseUrl = Deno.env.get('SB_URL')!
+    const supabaseKey = Deno.env.get('SB_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
     // 1. Obtener pedidos de WooCommerce

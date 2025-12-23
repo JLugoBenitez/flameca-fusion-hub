@@ -23,8 +23,8 @@ serve(async (req) => {
 
   try {
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      Deno.env.get("SB_URL") ?? "",
+      Deno.env.get("SB_SERVICE_ROLE_KEY") ?? "",
       {
         auth: {
           autoRefreshToken: false,
@@ -233,11 +233,11 @@ async function handlePasswordReset(supabaseAdmin: any, data: any, adminSettings:
     console.log(`Sending password reset SMS to: ${employee_phone}`);
     
     // Llamar directamente a la función send-sms usando fetch
-    const response = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-sms`, {
+    const response = await fetch(`${Deno.env.get("SB_URL")}/functions/v1/send-sms`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`
+        'Authorization': `Bearer ${Deno.env.get("SB_SERVICE_ROLE_KEY")}`
       },
       body: JSON.stringify({
         phone: employee_phone,
