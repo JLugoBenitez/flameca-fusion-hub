@@ -26,6 +26,8 @@ import TimeEntries from "./pages/TimeEntries";
 import Incidents from "./pages/Incidents";
 import Employees from "./pages/Employees";
 import Invoices from "./pages/Invoices";
+import CustomOrders from "./pages/CustomOrders";
+import SuitRepairs from "./pages/SuitRepairs";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -91,13 +93,15 @@ const App = () => (
             <NotificationProvider>
               <Toaster />
               <Sonner />
-              <BrowserRouter>
+              <BrowserRouter basename={import.meta.env.PROD ? '/' : '/'}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<ProtectedRoute><SessionManager><LayoutWithSidebar><Dashboard /></LayoutWithSidebar></SessionManager></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute><SessionManager><LayoutWithSidebar><Products /></LayoutWithSidebar></SessionManager></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute><SessionManager><LayoutWithSidebar><Orders /></LayoutWithSidebar></SessionManager></ProtectedRoute>} />
+            <Route path="/custom-orders" element={<ProtectedRoute><SessionManager><LayoutWithSidebar><CustomOrders /></LayoutWithSidebar></SessionManager></ProtectedRoute>} />
+            <Route path="/suit-repairs" element={<ProtectedRoute><SessionManager><LayoutWithSidebar><SuitRepairs /></LayoutWithSidebar></SessionManager></ProtectedRoute>} />
             <Route path="/pos" element={<ProtectedRoute><SessionManager><LayoutWithSidebar><PointOfSale /></LayoutWithSidebar></SessionManager></ProtectedRoute>} />
             <Route path="/time-entries" element={<ProtectedRoute><SessionManager><LayoutWithSidebar><TimeEntries /></LayoutWithSidebar></SessionManager></ProtectedRoute>} />
             <Route path="/incidents" element={<ProtectedRoute><SessionManager><LayoutWithSidebar><Incidents /></LayoutWithSidebar></SessionManager></ProtectedRoute>} />

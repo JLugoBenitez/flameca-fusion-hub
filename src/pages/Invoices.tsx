@@ -92,7 +92,8 @@ export default function Invoices() {
     sendDocument,
     payDocument,
     downloadDocumentPDF,
-    deleteDocument
+    deleteDocument,
+    syncDocuments
   } = useHoldedDocuments();
 
   const { generatePDF, isGenerating } = useLocalPDF();
@@ -439,6 +440,17 @@ export default function Invoices() {
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Actualizar
+            </Button>
+            <Button 
+              onClick={async () => {
+                await syncDocuments('invoice');
+              }}
+              variant="default"
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+              disabled={holdedLoading}
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${holdedLoading ? 'animate-spin' : ''}`} />
+              Sincronizar con Holded
             </Button>
           </div>
         </CardContent>

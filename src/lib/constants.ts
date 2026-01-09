@@ -32,6 +32,8 @@ export const ROUTES = {
   dashboard: '/dashboard',
   products: '/products',
   orders: '/orders',
+  customOrders: '/custom-orders',
+  suitRepairs: '/suit-repairs',
   pos: '/pos',
   timeEntries: '/time-entries',
   incidents: '/incidents',

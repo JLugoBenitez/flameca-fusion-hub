@@ -159,6 +159,9 @@ serve(async (req) => {
       case 'delete_contact':
         return await deleteContact(holdedApiKey, params, isTestMode)
       
+      case 'sync_documents':
+        return await syncDocumentsManually(holdedApiKey, params, isTestMode)
+      
       default:
         throw new Error(`Acción no soportada: ${action}`)
     }
@@ -205,13 +208,17 @@ async function listDocuments(apiKey: string, params: any, isTestMode: boolean) {
   }
 
   try {
-    // Obtener documentos de la base de datos local
+    // PRIMERO: Sincronizar documentos desde Holded API
+    const { type = 'invoice' } = params
+    await syncDocumentsFromHolded(apiKey, supabase, type)
+
+    // SEGUNDO: Obtener documentos de la base de datos local (ya sincronizados)
     let query = supabase
       .from('holded_documents')
       .select('*')
       .order('created_at', { ascending: false })
 
-    const { type, status, limit = 50, offset = 0 } = params
+    const { status, limit = 50, offset = 0 } = params
     
     if (type) {
       query = query.eq('type', type)
@@ -280,6 +287,270 @@ async function listDocuments(apiKey: string, params: any, isTestMode: boolean) {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
+  }
+}
+
+// Sincronizar documentos desde Holded API a la base de datos local
+async function syncDocumentsFromHolded(apiKey: string, supabase: any, docType: string = 'invoice') {
+  try {
+    console.log(`🔄 Sincronizando documentos de tipo ${docType} desde Holded...`)
+    
+    // Usar el endpoint correcto según la documentación de Holded
+    // GET https://api.holded.com/api/invoicing/v1/documents/{docType}
+    const endpoint = `https://api.holded.com/api/invoicing/v1/documents/${docType}`
+    
+    let holdedDocuments = null
+    let documentsArray = []
+    
+    try {
+      console.log(`🔍 Obteniendo documentos desde: ${endpoint}`)
+      console.log(`🔑 API Key: ${apiKey ? `${apiKey.substring(0, 8)}...` : 'NO ENCONTRADA'}`)
+      
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'key': apiKey
+        }
+      })
+
+      console.log(`📊 Respuesta de Holded: ${response.status} ${response.statusText}`)
+      console.log(`📊 Headers de respuesta:`, Object.fromEntries(response.headers.entries()))
+      
+      const responseText = await response.text()
+      console.log(`📄 Longitud de respuesta: ${responseText.length}`)
+      console.log(`📄 Primeros 1000 caracteres: ${responseText.substring(0, 1000)}`)
+      
+      if (response.ok) {
+        const contentType = response.headers.get('content-type')
+        console.log(`📄 Content-Type: ${contentType}`)
+        
+        // Intentar parsear como JSON siempre
+        try {
+          holdedDocuments = JSON.parse(responseText)
+          console.log(`✅ Respuesta JSON parseada correctamente`)
+          console.log(`📊 Tipo de respuesta: ${Array.isArray(holdedDocuments) ? 'Array' : typeof holdedDocuments}`)
+          if (Array.isArray(holdedDocuments)) {
+            console.log(`📊 Número de documentos: ${holdedDocuments.length}`)
+            if (holdedDocuments.length > 0) {
+              console.log(`📊 Primer documento (muestra):`, JSON.stringify(holdedDocuments[0]).substring(0, 500))
+            }
+          } else if (typeof holdedDocuments === 'object' && holdedDocuments !== null) {
+            console.log(`📊 Claves del objeto: ${Object.keys(holdedDocuments).join(', ')}`)
+            // Si es un objeto con una propiedad que contiene el array
+            if (holdedDocuments.documents && Array.isArray(holdedDocuments.documents)) {
+              holdedDocuments = holdedDocuments.documents
+              console.log(`📊 Documentos encontrados en propiedad 'documents': ${holdedDocuments.length}`)
+            } else if (holdedDocuments.data && Array.isArray(holdedDocuments.data)) {
+              holdedDocuments = holdedDocuments.data
+              console.log(`📊 Documentos encontrados en propiedad 'data': ${holdedDocuments.length}`)
+            }
+          }
+        } catch (parseError) {
+          console.log(`❌ Error parseando JSON: ${parseError.message}`)
+          console.log(`📄 Respuesta completa (primeros 2000 chars): ${responseText.substring(0, 2000)}`)
+          
+          // Si la respuesta es HTML o texto, puede ser un error
+          if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
+            console.log(`⚠️ Holded devolvió HTML en lugar de JSON`)
+          }
+        }
+      } else {
+        console.log(`❌ Error de Holded API (${response.status}): ${responseText.substring(0, 1000)}`)
+      }
+    } catch (fetchError) {
+      console.log(`❌ Error en fetch: ${fetchError.message}`)
+      console.log(`❌ Stack: ${fetchError.stack}`)
+    }
+    
+    // Si no obtuvimos documentos, informar
+    if (!holdedDocuments) {
+      console.log(`⚠️ No se pudieron obtener documentos de Holded API`)
+      console.log(`ℹ️ Usando solo documentos de la BD local (creados desde la app)`)
+      return
+    }
+    
+    // Extraer array de documentos de diferentes formatos posibles
+    if (Array.isArray(holdedDocuments)) {
+      documentsArray = holdedDocuments
+    } else if (holdedDocuments.documents && Array.isArray(holdedDocuments.documents)) {
+      documentsArray = holdedDocuments.documents
+    } else if (holdedDocuments.data && Array.isArray(holdedDocuments.data)) {
+      documentsArray = holdedDocuments.data
+    } else if (holdedDocuments.items && Array.isArray(holdedDocuments.items)) {
+      documentsArray = holdedDocuments.items
+    } else if (typeof holdedDocuments === 'object' && Object.keys(holdedDocuments).length > 0) {
+      // Si es un objeto único, convertirlo a array
+      documentsArray = [holdedDocuments]
+    }
+    
+    console.log(`📥 Obtenidos ${documentsArray.length} documentos de Holded API`)
+
+    // Sincronizar cada documento con la BD local
+    let syncedCount = 0
+    let updatedCount = 0
+    let createdCount = 0
+    
+    for (const doc of documentsArray) {
+      try {
+        // Extraer ID del documento (puede venir en diferentes formatos)
+        const docId = doc.id || doc._id || doc.documentId || doc.invoiceId || doc.number
+        
+        if (!docId) {
+          console.log(`⚠️ Documento sin ID, saltando:`, JSON.stringify(doc).substring(0, 100))
+          continue
+        }
+        
+        // Verificar si el documento ya existe
+        const { data: existing } = await supabase
+          .from('holded_documents')
+          .select('holded_id')
+          .eq('holded_id', String(docId))
+          .single()
+
+        // Extraer datos del documento según formato de Holded API
+        // La API devuelve documentos con estructura específica
+        const customerName = doc.contactName || doc.contact?.name || doc.customer?.name || doc.customerName || doc.name || 'Sin nombre'
+        const customerEmail = doc.contactEmail || doc.contact?.email || doc.customer?.email || doc.customerEmail || doc.email || ''
+        const customerPhone = doc.contactPhone || doc.contact?.phone || doc.customer?.phone || doc.customerPhone || doc.phone || ''
+        
+        // Total puede venir en diferentes campos según el tipo de documento
+        const totalAmount = doc.total || doc.totalAmount || doc.amount || doc.gross || doc.net || doc.subtotal || 0
+        
+        // Estado: mapear valores de Holded a los permitidos en BD
+        // BD solo acepta: 'draft', 'sent', 'paid', 'cancelled'
+        let status = 'draft' // valor por defecto
+        
+        const holdedStatus = doc.status || doc.state || doc.paidStatus
+        
+        if (typeof holdedStatus === 'number') {
+          // Si es número, mapear: 0=draft, 1=paid, 2=sent, etc.
+          if (holdedStatus === 0 || holdedStatus === '0') {
+            status = 'draft'
+          } else if (holdedStatus === 1 || holdedStatus === '1') {
+            status = 'paid'
+          } else if (holdedStatus === 2 || holdedStatus === '2') {
+            status = 'sent'
+          } else {
+            status = 'draft'
+          }
+        } else if (typeof holdedStatus === 'string') {
+          // Normalizar string a valores permitidos
+          const statusLower = holdedStatus.toLowerCase().trim()
+          if (['draft', 'borrador', '0'].includes(statusLower)) {
+            status = 'draft'
+          } else if (['sent', 'enviada', 'enviado', 'sent', '2'].includes(statusLower)) {
+            status = 'sent'
+          } else if (['paid', 'pagada', 'pagado', 'paid', '1', 'pago'].includes(statusLower)) {
+            status = 'paid'
+          } else if (['cancelled', 'cancelada', 'cancelado', 'cancel', 'cancelled'].includes(statusLower)) {
+            status = 'cancelled'
+          } else {
+            // Si no coincide, usar 'draft' por defecto
+            status = 'draft'
+          }
+        } else if (doc.paid) {
+          // Si tiene campo paid, usar 'paid'
+          status = 'paid'
+        } else if (doc.sent) {
+          // Si tiene campo sent, usar 'sent'
+          status = 'sent'
+        }
+        
+        // Items pueden venir como items, lineItems, lines, etc.
+        const items = doc.items || doc.lineItems || doc.lines || doc.linesItems || []
+        
+        // Notas
+        const notes = doc.notes || doc.description || doc.comment || doc.remarks || ''
+        
+        // Moneda
+        const currency = doc.currency || doc.curr || 'EUR'
+        
+        // Manejar fechas (Holded puede usar timestamps en segundos o milisegundos)
+        let date = new Date().toISOString()
+        if (doc.date || doc.created) {
+          const dateValue = doc.date || doc.created
+          if (typeof dateValue === 'number') {
+            // Si es timestamp, verificar si está en segundos o milisegundos
+            date = new Date(dateValue > 1000000000000 ? dateValue : dateValue * 1000).toISOString()
+          } else if (typeof dateValue === 'string') {
+            date = new Date(dateValue).toISOString()
+          }
+        }
+        
+        // Fecha de vencimiento
+        let dueDate = null
+        if (doc.dueDate || doc.due_date || doc.due) {
+          const due = doc.dueDate || doc.due_date || doc.due
+          if (typeof due === 'number') {
+            dueDate = new Date(due > 1000000000000 ? due : due * 1000).toISOString()
+          } else if (typeof due === 'string') {
+            dueDate = new Date(due).toISOString()
+          }
+        }
+
+        if (existing) {
+          // Actualizar documento existente
+          const { error: updateError } = await supabase
+            .from('holded_documents')
+            .update({
+              customer_name: customerName,
+              customer_email: customerEmail,
+              customer_phone: customerPhone,
+              total_amount: totalAmount,
+              status: status,
+              date: date,
+              due_date: dueDate,
+              items: items,
+              notes: notes,
+              currency: currency,
+              updated_at: new Date().toISOString()
+            })
+            .eq('holded_id', String(docId))
+
+          if (!updateError) {
+            updatedCount++
+          } else {
+            console.error(`❌ Error actualizando documento ${docId}:`, updateError)
+          }
+        } else {
+          // Insertar nuevo documento
+          const { error: insertError } = await supabase
+            .from('holded_documents')
+            .insert({
+              holded_id: String(docId),
+              type: docType,
+              customer_name: customerName,
+              customer_email: customerEmail,
+              customer_phone: customerPhone,
+              total_amount: totalAmount,
+              status: status,
+              date: date,
+              due_date: dueDate,
+              items: items,
+              notes: notes,
+              currency: currency,
+              language: 'es'
+            })
+
+          if (!insertError) {
+            createdCount++
+          } else {
+            console.error(`❌ Error insertando documento ${docId}:`, insertError)
+          }
+        }
+        
+        syncedCount++
+      } catch (syncError) {
+        console.error(`❌ Error sincronizando documento:`, syncError)
+      }
+    }
+
+    console.log(`✅ Sincronización completada: ${syncedCount} procesados, ${createdCount} creados, ${updatedCount} actualizados`)
+  } catch (error) {
+    console.error('❌ Error en syncDocumentsFromHolded:', error)
+    console.error('📋 Stack trace:', error.stack)
+    // No lanzar error, continuar con BD local
   }
 }
 
@@ -969,4 +1240,51 @@ async function findOrCreateContact(apiKey: string, customer: any): Promise<strin
 
   // Fallback: generar ID único
   return `contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Sincronizar documentos manualmente
+async function syncDocumentsManually(apiKey: string, params: any, isTestMode: boolean) {
+  const supabaseUrl = Deno.env.get('SB_URL')!
+  const supabaseKey = Deno.env.get('SB_SERVICE_ROLE_KEY')!
+  const supabase = createClient(supabaseUrl, supabaseKey)
+  
+  if (isTestMode) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Sincronización completada (modo test)',
+        synced: 1
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
+
+  try {
+    const { type = 'invoice' } = params
+    await syncDocumentsFromHolded(apiKey, supabase, type)
+    
+    // Obtener conteo de documentos sincronizados
+    const { count } = await supabase
+      .from('holded_documents')
+      .select('*', { count: 'exact', head: true })
+      .eq('type', type)
+    
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Sincronización completada',
+        count: count || 0
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    console.error('❌ Error en syncDocumentsManually:', error)
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    )
+  }
 }

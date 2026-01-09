@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useAutoNotifications } from './useAutoNotifications';
 
@@ -41,26 +42,20 @@ export const useWooCommercePolling = () => {
 
       try {
         
-        // Llamar a nuestra Edge Function que consulta WooCommerce
-        const response = await fetch('http://localhost:54321/functions/v1/sync-woocommerce-orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        // Llamar a nuestra Edge Function que consulta WooCommerce usando Supabase client
+        const { data, error } = await supabase.functions.invoke('sync-woocommerce-orders', {
+          body: {
             action: 'get_recent_orders',
             limit: 5
-          })
+          }
         });
 
-        if (!response.ok) {
-          console.error('Error consultando WooCommerce:', response.status);
+        if (error) {
+          console.error('Error consultando WooCommerce:', error);
           return;
         }
-
-        const data = await response.json();
         
-        if (data.success && data.orders) {
+        if (data && data.success && data.orders) {
           const orders: WooCommerceOrder[] = data.orders;
           
           // Buscar pedidos nuevos
@@ -77,20 +72,15 @@ export const useWooCommercePolling = () => {
               
               // Sincronizar el pedido a la base de datos local
               try {
-                const syncResponse = await fetch('http://localhost:54321/functions/v1/sync-woocommerce-orders', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
+                const { error: syncError } = await supabase.functions.invoke('sync-woocommerce-orders', {
+                  body: {
                     action: 'sync_single_order',
                     orderId: order.id
-                  })
+                  }
                 });
                 
-                if (syncResponse.ok) {
-                } else {
-                  console.error('❌ Error sincronizando pedido:', order.id);
+                if (syncError) {
+                  console.error('❌ Error sincronizando pedido:', order.id, syncError);
                 }
               } catch (error) {
                 console.error('❌ Error en sincronización:', error);
@@ -126,65 +116,57 @@ export const useWooCommercePolling = () => {
         }
 
         // Consultar productos para verificar stock
-        const productsResponse = await fetch('http://localhost:54321/functions/v1/sync-woocommerce-products', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        const { data: productsData, error: productsError } = await supabase.functions.invoke('sync-woocommerce-products', {
+          body: {
             action: 'get_products',
             limit: 20
-          })
+          }
         });
 
-        if (productsResponse.ok) {
-          const productsData = await productsResponse.json();
+        if (!productsError && productsData && productsData.data) {
+          const products: WooCommerceProduct[] = productsData.data;
           
-          if (productsData.data) {
-            const products: WooCommerceProduct[] = productsData.data;
+          for (const product of products) {
+            const lastStock = lastProductStocks.current.get(product.id);
             
-            for (const product of products) {
-              const lastStock = lastProductStocks.current.get(product.id);
-              
-              if (lastStock !== undefined) {
-                // Verificar cambios de stock
-                if (product.stock_quantity !== lastStock) {
-                  
-                  let notificationType = '';
-                  let title = '';
-                  let message = '';
-                  
-                  if (product.stock_quantity === 0) {
-                    // Stock agotado
-                    notificationType = 'out_of_stock';
-                    title = '🚨 Stock Agotado';
-                    message = `Producto "${product.name}" se ha agotado`;
-                  } else if (product.stock_quantity <= 2) {
-                    // Stock bajo
-                    notificationType = 'low_stock';
-                    title = '⚠️ Stock Bajo';
-                    message = `Producto "${product.name}" tiene solo ${product.stock_quantity} unidades`;
-                  } else if (lastStock === 0 && product.stock_quantity > 0) {
-                    // Stock restaurado
-                    notificationType = 'low_stock';
-                    title = '✅ Stock Restaurado';
-                    message = `Producto "${product.name}" tiene ${product.stock_quantity} unidades disponibles`;
-                  }
-                  
-                  if (notificationType) {
-                    addNotification({
-                      type: notificationType as any,
-                      title,
-                      message,
-                      section: 'products'
-                    });
-                  }
+            if (lastStock !== undefined) {
+              // Verificar cambios de stock
+              if (product.stock_quantity !== lastStock) {
+                
+                let notificationType = '';
+                let title = '';
+                let message = '';
+                
+                if (product.stock_quantity === 0) {
+                  // Stock agotado
+                  notificationType = 'out_of_stock';
+                  title = '🚨 Stock Agotado';
+                  message = `Producto "${product.name}" se ha agotado`;
+                } else if (product.stock_quantity <= 2) {
+                  // Stock bajo
+                  notificationType = 'low_stock';
+                  title = '⚠️ Stock Bajo';
+                  message = `Producto "${product.name}" tiene solo ${product.stock_quantity} unidades`;
+                } else if (lastStock === 0 && product.stock_quantity > 0) {
+                  // Stock restaurado
+                  notificationType = 'low_stock';
+                  title = '✅ Stock Restaurado';
+                  message = `Producto "${product.name}" tiene ${product.stock_quantity} unidades disponibles`;
+                }
+                
+                if (notificationType) {
+                  addNotification({
+                    type: notificationType as any,
+                    title,
+                    message,
+                    section: 'products'
+                  });
                 }
               }
-              
-              // Actualizar el stock conocido
-              lastProductStocks.current.set(product.id, product.stock_quantity);
             }
+            
+            // Actualizar el stock conocido
+            lastProductStocks.current.set(product.id, product.stock_quantity);
           }
         }
 

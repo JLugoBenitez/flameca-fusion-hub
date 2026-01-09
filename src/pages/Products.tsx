@@ -16,9 +16,23 @@ import { Product } from "@/types";
 import { useWooCommerceProducts } from "@/hooks/useWooCommerceProducts";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { PermissionGate } from "@/components/PermissionGate";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 
 export default function Products() {
-  const { products, loading, refetch, fetchProducts, syncProducts } = useWooCommerceProducts();
+  const { 
+    products, 
+    loading, 
+    refetch, 
+    fetchProducts, 
+    syncProducts,
+    currentPage,
+    totalPages,
+    totalProducts,
+    productsPerPage,
+    goToPage,
+    nextPage,
+    prevPage
+  } = useWooCommerceProducts();
   const { notifyLowStock, notifyOutOfStock } = useAutoNotifications();
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "in-stock" | "low-stock" | "very-low-stock" | "out-of-stock">("all");
@@ -428,7 +442,7 @@ export default function Products() {
             size="sm"
             onClick={() => setStockFilter("all")}
           >
-            Todos ({products.length})
+            Todos ({totalProducts > 0 ? totalProducts : products.length})
           </Button>
           <Button
             variant={stockFilter === "in-stock" ? "default" : "outline"}
@@ -619,6 +633,64 @@ export default function Products() {
           })
         )}
       </div>
+
+      {/* Paginación */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Mostrando {((currentPage - 1) * productsPerPage) + 1} - {Math.min(currentPage * productsPerPage, totalProducts)} de {totalProducts} productos
+          </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={prevPage} 
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              
+              {/* Mostrar números de página */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink
+                      onClick={() => goToPage(pageNum)}
+                      isActive={currentPage === pageNum}
+                      className="cursor-pointer"
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+              
+              {totalPages > 5 && currentPage < totalPages - 2 && (
+                <PaginationItem>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              )}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={nextPage} 
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {!loading && products.length === 0 && (
         <Card className="shadow-md">

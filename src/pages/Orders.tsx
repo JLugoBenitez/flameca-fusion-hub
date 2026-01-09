@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Package, RefreshCw, Phone, DollarSign, CreditCard, Clock, User, MapPin, FileText, CheckCircle } from "lucide-react";
+import { Package, RefreshCw, Phone, DollarSign, CreditCard, Clock, User, MapPin, FileText, CheckCircle, Search, Loader2 } from "lucide-react";
 import { useWooCommerceOrders } from "@/hooks/useWooCommerceOrders";
 import { useHoldedDocuments } from "@/hooks/useHoldedDocuments";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -35,6 +36,8 @@ export default function Orders() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [invoicing, setInvoicing] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed" | "cancelled">("all");
   
   const { syncNewOrders } = useWooCommerceOrders();
   const { createInvoiceFromOrder } = useHoldedDocuments();
@@ -46,6 +49,7 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from("orders")
         .select(`
@@ -58,8 +62,7 @@ export default function Orders() {
             subtotal
           )
         `)
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setOrders(data || []);
@@ -183,6 +186,7 @@ export default function Orders() {
     switch (status) {
       case 'pending': return 'bg-yellow-500';
       case 'completed': return 'bg-green-500';
+      case 'cancelled': return 'bg-red-500';
       default: return 'bg-gray-500';
     }
   };
@@ -191,6 +195,7 @@ export default function Orders() {
     switch (status) {
       case 'pending': return 'Pendiente';
       case 'completed': return 'Completado';
+      case 'cancelled': return 'Cancelado';
       default: return status;
     }
   };
@@ -248,8 +253,29 @@ export default function Orders() {
     }
   ];
 
-  // Usar solo datos reales
-  const displayOrders = orders;
+  // Filtrar pedidos por término de búsqueda y estado
+  const filteredOrders = useMemo(() => {
+    let filtered = orders;
+    
+    // Filtro por búsqueda
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(order =>
+        order.customer_name.toLowerCase().includes(searchLower) ||
+        order.customer_email.toLowerCase().includes(searchLower) ||
+        order.customer_phone.toLowerCase().includes(searchLower) ||
+        order.woocommerce_order_id?.toLowerCase().includes(searchLower) ||
+        order.order_items.some(item => item.name.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    // Filtro por estado
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+    
+    return filtered;
+  }, [orders, searchTerm, statusFilter]);
 
   if (loading) {
     return (
@@ -308,12 +334,74 @@ export default function Orders() {
           <div>
             <h2 className="text-2xl font-bold">Lista de Pedidos</h2>
             <p className="text-sm text-muted-foreground">
-              {displayOrders.length} {displayOrders.length === 1 ? 'pedido' : 'pedidos'} registrados
+              {filteredOrders.length} de {orders.length} {orders.length === 1 ? 'pedido' : 'pedidos'} registrados
             </p>
           </div>
         </div>
+
+        {/* Search Bar y Filtros */}
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por cliente, email, teléfono, ID de pedido o producto..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={fetchOrders} 
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              <span className="ml-2">Actualizar</span>
+            </Button>
+          </div>
+          
+          {/* Filtros de Estado */}
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={statusFilter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter("all")}
+            >
+              Todos ({orders.length})
+            </Button>
+            <Button
+              variant={statusFilter === "pending" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter("pending")}
+              className="border-yellow-500 text-yellow-600 hover:bg-yellow-50"
+            >
+              ⏳ Pendientes ({(orders.filter(o => o.status === 'pending')).length})
+            </Button>
+            <Button
+              variant={statusFilter === "completed" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter("completed")}
+              className="border-green-500 text-green-600 hover:bg-green-50"
+            >
+              ✅ Completados ({(orders.filter(o => o.status === 'completed')).length})
+            </Button>
+            <Button
+              variant={statusFilter === "cancelled" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter("cancelled")}
+              className="border-red-500 text-red-600 hover:bg-red-50"
+            >
+              ❌ Cancelados ({(orders.filter(o => o.status === 'cancelled')).length})
+            </Button>
+          </div>
+        </div>
         
-        {displayOrders.length === 0 ? (
+        {filteredOrders.length === 0 ? (
           <Card className="shadow-md">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Package className="h-16 w-16 text-muted-foreground mb-4" />
@@ -323,7 +411,7 @@ export default function Orders() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {displayOrders.map((order, index) => (
+            {filteredOrders.map((order, index) => (
               <Card 
                 key={order.id} 
                 className="shadow-md hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary/20 hover:border-l-primary animate-in slide-in-from-bottom-4"

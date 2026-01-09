@@ -1,4 +1,4 @@
-import { Home, Package, Users, ClipboardList, AlertCircle, Clock, LogOut, FileText, ShoppingCart, Settings, LucideIcon } from "lucide-react";
+import { Home, Package, Users, ClipboardList, AlertCircle, Clock, LogOut, FileText, ShoppingCart, Settings, LucideIcon, Receipt, Scissors } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -33,6 +33,8 @@ const menuItems: MenuItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: Home, permission: "view_dashboard" },
   { title: "Productos", url: "/products", icon: Package, permission: "view_products", section: "products" },
   { title: "Pedidos", url: "/orders", icon: ClipboardList, permission: "view_orders", section: "orders" },
+  { title: "Encargos", url: "/custom-orders", icon: Receipt, permission: "view_orders", section: "orders" },
+  { title: "Arreglos", url: "/suit-repairs", icon: Scissors, permission: "view_orders", section: "orders" },
   { title: "TPV", url: "/pos", icon: ShoppingCart, permission: "access_pos", section: "pos" },
   { title: "Fichajes", url: "/time-entries", icon: Clock, permission: "view_time_entries" },
   { title: "Incidencias", url: "/incidents", icon: AlertCircle, permission: "view_incidents", section: "incidents" },

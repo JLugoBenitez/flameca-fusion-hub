@@ -132,6 +132,26 @@ export function useHoldedDocuments() {
     return result;
   }, [callHoldedAPI, listDocuments]);
 
+  // Sincronizar documentos manualmente desde Holded
+  const syncDocuments = useCallback(async (type: HoldedDocument['type'] = 'invoice') => {
+    setLoading(true);
+    try {
+      const result = await callHoldedAPI<{ message: string; count: number }>('sync_documents', { type });
+      if (result.success) {
+        toast.success(`Sincronización completada: ${result.count || 0} documentos`);
+        // Recargar lista de documentos después de sincronizar
+        await listDocuments({ type });
+      }
+      return result;
+    } catch (error: any) {
+      console.error('Error syncing documents:', error);
+      toast.error('Error al sincronizar documentos: ' + (error.message || 'Error desconocido'));
+      return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
+    }
+  }, [callHoldedAPI, listDocuments]);
+
   // Enviar documento por email
   const sendDocument = useCallback(async (
     documentId: string, 
@@ -718,6 +738,7 @@ export function useHoldedDocuments() {
     payDocument,
     getDocumentPDF,
     downloadDocumentPDF,
+    syncDocuments,
     
     // Contactos
     listContacts,

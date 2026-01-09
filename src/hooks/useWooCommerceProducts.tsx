@@ -7,6 +7,10 @@ export function useWooCommerceProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const productsPerPage = 50;
 
   const transformProduct = useCallback((product: any): Product => ({
     id: product.id,
@@ -54,7 +58,7 @@ export function useWooCommerceProducts() {
     _links: product._links
   }), []);
 
-  const fetchProducts = useCallback(async (params: { per_page?: number; stock_status?: string } = {}) => {
+  const fetchProducts = useCallback(async (page: number = 1, params: { stock_status?: string; search?: string } = {}) => {
     try {
       setLoading(true);
       setError(null);
@@ -63,7 +67,8 @@ export function useWooCommerceProducts() {
         body: { 
           action: 'list',
           params: {
-            per_page: 100,
+            page,
+            per_page: productsPerPage,
             ...params
           }
         }
@@ -71,10 +76,25 @@ export function useWooCommerceProducts() {
 
       if (error) throw error;
 
+      const pageProducts = data?.data || [];
+      const pagination = data?.pagination;
+
       // Transformar productos de WooCommerce al formato esperado
-      const transformedProducts = (data.data || []).map(transformProduct);
+      const transformedProducts = pageProducts.map(transformProduct);
 
       setProducts(transformedProducts);
+      setCurrentPage(page);
+      
+      if (pagination) {
+        setTotalPages(pagination.totalPages || 1);
+        setTotalProducts(pagination.total || 0);
+      } else {
+        // Si no hay paginación, asumir que hay más páginas si obtuvimos productosPerPage productos
+        setTotalPages(pageProducts.length === productsPerPage ? page + 1 : page);
+        setTotalProducts(pageProducts.length);
+      }
+
+      console.log(`✅ Página ${page}: ${transformedProducts.length} productos de WooCommerce`);
     } catch (err: any) {
       console.error('Error fetching products:', err);
       const errorMessage = err.message || 'Error al cargar productos';
@@ -83,7 +103,7 @@ export function useWooCommerceProducts() {
     } finally {
       setLoading(false);
     }
-  }, [transformProduct]);
+  }, [transformProduct, productsPerPage]);
 
   const updateProductStock = useCallback(async (productId: number, newStock: number) => {
     try {
@@ -114,15 +134,15 @@ export function useWooCommerceProducts() {
   const syncProducts = useCallback(async () => {
     try {
       const { data, error } = await supabase.functions.invoke('sync-woocommerce-products', {
-        body: { action: 'list' },
+        body: { action: 'list', params: { page: 1, per_page: 1 } },
       });
 
       if (error) {
         throw new Error(`Error en sincronización de productos: ${error.message}`);
       }
 
-      // Recargar los productos después de la sincronización
-      await fetchProducts();
+      // Recargar los productos después de la sincronización (primera página)
+      await fetchProducts(1);
     } catch (error) {
       console.error('Error en sincronización de productos:', error);
       throw error;
@@ -130,16 +150,31 @@ export function useWooCommerceProducts() {
   }, [fetchProducts]);
 
   useEffect(() => {
-    fetchProducts();
+    fetchProducts(1);
   }, [fetchProducts]);
 
   return {
     products,
     loading,
     error,
+    currentPage,
+    totalPages,
+    totalProducts,
+    productsPerPage,
     fetchProducts,
     updateProductStock,
     syncProducts,
-    refetch: useCallback(() => fetchProducts(), [fetchProducts])
+    goToPage: useCallback((page: number) => fetchProducts(page), [fetchProducts]),
+    nextPage: useCallback(() => {
+      if (currentPage < totalPages) {
+        fetchProducts(currentPage + 1);
+      }
+    }, [currentPage, totalPages, fetchProducts]),
+    prevPage: useCallback(() => {
+      if (currentPage > 1) {
+        fetchProducts(currentPage - 1);
+      }
+    }, [currentPage, fetchProducts]),
+    refetch: useCallback(() => fetchProducts(currentPage), [currentPage, fetchProducts])
   };
 }
