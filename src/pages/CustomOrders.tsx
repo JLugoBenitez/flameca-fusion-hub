@@ -180,8 +180,6 @@ export default function CustomOrders() {
 
         if (error) throw error;
         toast.success("Encargo actualizado correctamente");
-        // Si es edición, recargar archivos
-        await fetchOrderFiles(editingOrder.id);
       } else {
         const { data: newOrder, error } = await supabase
           .from("custom_orders")
@@ -191,28 +189,12 @@ export default function CustomOrders() {
 
         if (error) throw error;
         toast.success("Encargo creado correctamente");
-        // Después de crear, establecer el encargo como editando para poder subir archivos
-        if (newOrder) {
-          const fullOrder: CustomOrder = {
-            ...newOrder,
-            order_date: formData.order_date,
-            customer_name: formData.customer_name,
-            fabric: formData.fabric || null,
-            size: formData.size || null,
-            model: formData.model || null,
-            observations: formData.observations || null,
-            registration_date: formData.registration_date,
-            delivery_date: formData.delivery_date || null,
-            created_by: user?.id || null,
-            created_at: newOrder.created_at || new Date().toISOString(),
-            updated_at: newOrder.updated_at || new Date().toISOString(),
-          };
-          setEditingOrder(fullOrder);
-          await fetchOrderFiles(newOrder.id);
-        }
       }
 
+      // Tras crear o actualizar, recargar lista y cerrar el formulario
       fetchOrders();
+      setDialogOpen(false);
+      resetForm();
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Error al guardar el encargo");

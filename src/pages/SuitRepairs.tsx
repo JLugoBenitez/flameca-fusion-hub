@@ -222,8 +222,6 @@ export default function SuitRepairs() {
 
         if (error) throw error;
         toast.success("Arreglo actualizado correctamente");
-        // Si es edición, recargar archivos
-        await fetchRepairFiles(editingRepair.id);
       } else {
         const { data: newRepair, error } = await supabase
           .from("suit_repairs")
@@ -233,30 +231,12 @@ export default function SuitRepairs() {
 
         if (error) throw error;
         toast.success("Arreglo creado correctamente");
-        // Después de crear, establecer el arreglo como editando para poder subir archivos
-        if (newRepair) {
-          const fullRepair: SuitRepair = {
-            ...newRepair,
-            repair_date: formData.repair_date,
-            customer_name: formData.customer_name,
-            garment_type: formData.garment_type || null,
-            repair_type: formData.repair_type || null,
-            size: formData.size || null,
-            observations: formData.observations || null,
-            registration_date: formData.registration_date,
-            delivery_date: formData.delivery_date || null,
-            status: formData.status,
-            price: formData.price ? parseFloat(formData.price) : null,
-            created_by: user?.id || null,
-            created_at: newRepair.created_at || new Date().toISOString(),
-            updated_at: newRepair.updated_at || new Date().toISOString(),
-          };
-          setEditingRepair(fullRepair);
-          await fetchRepairFiles(newRepair.id);
-        }
       }
 
+      // Tras crear o actualizar, recargar lista y cerrar el formulario
       fetchRepairs();
+      setDialogOpen(false);
+      resetForm();
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Error al guardar el arreglo");

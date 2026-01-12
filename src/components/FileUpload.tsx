@@ -200,43 +200,95 @@ export function FileUpload({
 
       {files.length > 0 && (
         <div className="space-y-2">
-          {files.map((file) => (
-            <div
-              key={file.id}
-              className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                {getFileIcon(file.file_type)}
-                <div className="flex-1 min-w-0">
-                  <a
-                    href={getFileUrl(file.file_path)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium hover:underline truncate block"
-                  >
-                    {file.file_name}
-                  </a>
-                  <p className="text-xs text-muted-foreground">
-                    {formatFileSize(file.file_size)} • {new Date(file.created_at).toLocaleDateString('es-ES')}
-                  </p>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setDeleteConfirm(file)}
-                disabled={deletingFile === file.id}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          {files.map((file) => {
+            const isImage = file.file_type?.startsWith('image/');
+            const fileUrl = getFileUrl(file.file_path);
+            
+            return (
+              <div
+                key={file.id}
+                className="border rounded-lg hover:bg-muted/50 transition-colors overflow-hidden"
               >
-                {deletingFile === file.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                {isImage ? (
+                  <div className="p-3 space-y-2">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0">
+                        <img
+                          src={fileUrl}
+                          alt={file.file_name}
+                          className="w-20 h-20 object-cover rounded border"
+                          onError={(e) => {
+                            // Si falla la carga de la imagen, mostrar icono
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium hover:underline truncate block"
+                        >
+                          {file.file_name}
+                        </a>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.file_size)} • {new Date(file.created_at).toLocaleDateString('es-ES')}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteConfirm(file)}
+                        disabled={deletingFile === file.id}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                      >
+                        {deletingFile === file.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
-                  <X className="h-4 w-4" />
+                  <div className="flex items-center justify-between p-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {getFileIcon(file.file_type)}
+                      <div className="flex-1 min-w-0">
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium hover:underline truncate block"
+                        >
+                          {file.file_name}
+                        </a>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.file_size)} • {new Date(file.created_at).toLocaleDateString('es-ES')}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeleteConfirm(file)}
+                      disabled={deletingFile === file.id}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      {deletingFile === file.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 )}
-              </Button>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 

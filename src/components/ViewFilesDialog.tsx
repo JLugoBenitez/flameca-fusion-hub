@@ -149,70 +149,150 @@ export function ViewFilesDialog({
             </div>
           ) : (
             <div className="space-y-3">
-              {files.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    {getFileIcon(file.file_type)}
-                    <div className="flex-1 min-w-0">
-                      <a
-                        href={getFileUrl(file.file_path)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium hover:underline truncate block"
-                      >
-                        {file.file_name}
-                      </a>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(file.file_size)}
-                        </p>
-                        <span className="text-xs text-muted-foreground">•</span>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(file.created_at).toLocaleDateString("es-ES", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
+              {files.map((file) => {
+                const isImage = file.file_type?.startsWith('image/');
+                const fileUrl = getFileUrl(file.file_path);
+                
+                return (
+                  <div
+                    key={file.id}
+                    className="border rounded-lg hover:bg-muted/50 transition-colors overflow-hidden"
+                  >
+                    {isImage ? (
+                      <div className="p-4 space-y-3">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            <img
+                              src={fileUrl}
+                              alt={file.file_name}
+                              className="w-32 h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => window.open(fileUrl, '_blank')}
+                              onError={(e) => {
+                                // Si falla la carga de la imagen, mostrar icono
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium hover:underline truncate block"
+                            >
+                              {file.file_name}
+                            </a>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.file_size)}
+                              </p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(file.created_at).toLocaleDateString("es-ES", {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                            >
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download={file.file_name}
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteConfirm(file)}
+                              disabled={deletingFile === file.id}
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              {deletingFile === file.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <X className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          {getFileIcon(file.file_type)}
+                          <div className="flex-1 min-w-0">
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-medium hover:underline truncate block"
+                            >
+                              {file.file_name}
+                            </a>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.file_size)}
+                              </p>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(file.created_at).toLocaleDateString("es-ES", {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                          >
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download={file.file_name}
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteConfirm(file)}
+                            disabled={deletingFile === file.id}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            {deletingFile === file.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                    >
-                      <a
-                        href={getFileUrl(file.file_path)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download={file.file_name}
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteConfirm(file)}
-                      disabled={deletingFile === file.id}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      {deletingFile === file.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <X className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </DialogContent>

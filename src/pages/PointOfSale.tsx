@@ -14,14 +14,16 @@ import { useWooCommerceProducts } from "@/hooks/useWooCommerceProducts";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { toast } from "sonner";
-import { ShoppingCart, Trash2, CreditCard, Banknote, Plus, Minus, Search, DollarSign, Percent, Loader2 } from "lucide-react";
+import { ShoppingCart, Trash2, CreditCard, Banknote, Plus, Minus, Search, DollarSign, Percent, Loader2, Printer, Eye } from "lucide-react";
 import { Product, CartItem } from "@/types";
+import { useTicketPDF } from "@/hooks/useTicketPDF";
 
 export default function PointOfSale() {
   const { can } = useUserRole();
   const { products, loading: productsLoading, updateProductStock } = useWooCommerceProducts();
   const { showPromise } = useNotifications();
   const { notifyLowStock, notifyOutOfStock } = useAutoNotifications();
+  const { generateTicket, printTicket, isGenerating: isGeneratingTicket } = useTicketPDF();
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -493,6 +495,54 @@ export default function PointOfSale() {
                           </SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    {/* Botones de ticket */}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          if (cartItems.length === 0) {
+                            toast.error("El carrito está vacío");
+                            return;
+                          }
+                          generateTicket({
+                            items: cartItems,
+                            subtotal: calculateSubtotal(),
+                            discount: calculateDiscount(),
+                            total: calculateTotal(),
+                            paymentMethod: paymentMethod,
+                            ticketNumber: `TICKET-${Date.now()}`
+                          }, { preview: true });
+                        }}
+                        disabled={cartItems.length === 0 || isGeneratingTicket}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver Ticket
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          if (cartItems.length === 0) {
+                            toast.error("El carrito está vacío");
+                            return;
+                          }
+                          printTicket({
+                            items: cartItems,
+                            subtotal: calculateSubtotal(),
+                            discount: calculateDiscount(),
+                            total: calculateTotal(),
+                            paymentMethod: paymentMethod,
+                            ticketNumber: `TICKET-${Date.now()}`
+                          });
+                        }}
+                        disabled={cartItems.length === 0 || isGeneratingTicket}
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Imprimir
+                      </Button>
                     </div>
 
                     {/* Botón procesar venta */}
