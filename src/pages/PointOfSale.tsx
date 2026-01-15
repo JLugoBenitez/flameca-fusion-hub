@@ -14,38 +14,210 @@ import { useWooCommerceProducts } from "@/hooks/useWooCommerceProducts";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { toast } from "sonner";
-import { ShoppingCart, Trash2, CreditCard, Banknote, Plus, Minus, Search, DollarSign, Percent, Loader2, Printer, Eye } from "lucide-react";
+import { ShoppingCart, Trash2, CreditCard, Banknote, Plus, Minus, Search, DollarSign, Percent, Loader2, Printer, Eye, ArrowLeft, Folder } from "lucide-react";
 import { Product, CartItem } from "@/types";
 import { useTicketPDF } from "@/hooks/useTicketPDF";
 
 export default function PointOfSale() {
   const { can } = useUserRole();
-  const { products, loading: productsLoading, updateProductStock } = useWooCommerceProducts();
+  const { products, loading: productsLoading, updateProductStock, categories, categoriesLoading } = useWooCommerceProducts();
   const { showPromise } = useNotifications();
   const { notifyLowStock, notifyOutOfStock } = useAutoNotifications();
   const { generateTicket, printTicket, isGenerating: isGeneratingTicket } = useTicketPDF();
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>("Efectivo");
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [processing, setProcessing] = useState(false);
+  const [loadingAllProducts, setLoadingAllProducts] = useState(false);
+
+  // Cargar todos los productos con stock para el TPV
+  useEffect(() => {
+    const loadAllProducts = async () => {
+      if (productsLoading) return;
+      
+      setLoadingAllProducts(true);
+      try {
+        // Obtener todos los productos (no solo con stock, para incluir todos)
+        // Luego filtraremos por stock > 0
+        let allProductsList: Product[] = [];
+        let currentPage = 1;
+        let hasMore = true;
+        const perPage = 100;
+
+        console.log('🔄 TPV: Iniciando carga de todos los productos...');
+
+        while (hasMore) {
+          const { data, error } = await supabase.functions.invoke('sync-woocommerce-products', {
+            body: { 
+              action: 'list',
+              params: {
+                page: currentPage,
+                per_page: perPage
+                // No filtrar por stock_status aquí para obtener TODOS los productos
+              }
+            }
+          });
+
+          if (error) {
+            console.error('Error en página', currentPage, error);
+            break;
+          }
+
+          const pageProducts = data?.data || [];
+          const pagination = data?.pagination;
+
+          console.log(`📦 TPV: Página ${currentPage}: ${pageProducts.length} productos obtenidos`);
+
+          // Transformar productos
+          const transformed = pageProducts.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            price: parseFloat(p.price),
+            stock: p.stock_quantity || 0,
+            stock_quantity: p.stock_quantity || null,
+            category: p.categories?.[0]?.name || 'General',
+            woocommerce_id: p.id,
+            description: p.description,
+            sku: p.sku,
+            status: p.status,
+            stock_status: p.stock_status,
+            regular_price: p.regular_price,
+            sale_price: p.sale_price,
+            on_sale: p.on_sale,
+            purchasable: p.purchasable,
+            virtual: p.virtual,
+            downloadable: p.downloadable,
+            weight: p.weight,
+            dimensions: p.dimensions,
+            shipping_required: p.shipping_required,
+            reviews_allowed: p.reviews_allowed,
+            average_rating: p.average_rating,
+            rating_count: p.rating_count,
+            categories: p.categories || [], // Asegurar que siempre sea un array
+            tags: p.tags,
+            images: p.images,
+            attributes: p.attributes,
+            default_attributes: p.default_attributes,
+            variations: p.variations,
+            grouped_products: p.grouped_products,
+            menu_order: p.menu_order,
+            price_html: p.price_html,
+            related_ids: p.related_ids,
+            meta_data: p.meta_data,
+            has_options: p.has_options,
+            post_password: p.post_password,
+            global_unique_id: p.global_unique_id,
+            exclude_global_add_ons: p.exclude_global_add_ons,
+            addons: p.addons,
+            jetpack_publicize_connections: p.jetpack_publicize_connections,
+            jetpack_sharing_enabled: p.jetpack_sharing_enabled,
+            jetpack_likes_enabled: p.jetpack_likes_enabled,
+            _links: p._links
+          }));
+
+          allProductsList = [...allProductsList, ...transformed];
+
+          if (pagination) {
+            hasMore = currentPage < pagination.totalPages;
+            currentPage++;
+            console.log(`📄 TPV: Total páginas: ${pagination.totalPages}, página actual: ${currentPage}`);
+          } else {
+            hasMore = pageProducts.length === perPage;
+            currentPage++;
+          }
+
+          // Limitar a un máximo razonable
+          if (currentPage > 30) {
+            console.log('⚠️ TPV: Límite de páginas alcanzado (30)');
+            break; // Máximo 3000 productos
+          }
+        }
+
+        // Filtrar solo productos con stock > 0
+        const productsWithStock = allProductsList.filter(p => p.stock > 0);
+        
+        console.log(`✅ TPV: Cargados ${allProductsList.length} productos totales, ${productsWithStock.length} con stock`);
+        
+        // Log de categorías de productos para debug
+        const categoryCounts = new Map<number, number>();
+        productsWithStock.forEach(p => {
+          p.categories?.forEach(cat => {
+            categoryCounts.set(cat.id, (categoryCounts.get(cat.id) || 0) + 1);
+          });
+        });
+        console.log('📊 TPV: Productos por categoría:', Array.from(categoryCounts.entries()).slice(0, 10));
+        
+        setAllProducts(productsWithStock);
+      } catch (err: any) {
+        console.error('❌ Error cargando todos los productos para TPV:', err);
+        // Si falla, usar los productos ya cargados
+        const fallbackProducts = products.filter(p => p.stock > 0);
+        console.log(`⚠️ TPV: Usando productos del hook como fallback: ${fallbackProducts.length} productos`);
+        setAllProducts(fallbackProducts);
+      } finally {
+        setLoadingAllProducts(false);
+      }
+    };
+
+    // Solo cargar si no hay productos ya cargados o si productsLoading cambió
+    if (!productsLoading) {
+      loadAllProducts();
+    }
+  }, [productsLoading, products]);
 
   useEffect(() => {
-    // Filtrar productos con stock > 0
-    const productsWithStock = products.filter(p => p.stock > 0);
+    // Usar allProducts en lugar de products para tener todos los productos
+    let productsToFilter = allProducts.length > 0 ? allProducts : products.filter(p => p.stock > 0);
     
+    console.log('📦 Productos disponibles para filtrar:', productsToFilter.length);
+    console.log('📋 Categoría seleccionada:', selectedCategory);
+    
+    // Filtrar por categoría si hay una seleccionada
+    if (selectedCategory !== null) {
+      const beforeFilter = productsToFilter.length;
+      productsToFilter = productsToFilter.filter(p => {
+        const hasCategory = p.categories?.some(cat => cat.id === selectedCategory);
+        if (!hasCategory && p.categories && p.categories.length > 0) {
+          console.log('🔍 Producto sin categoría coincidente:', {
+            productName: p.name,
+            productCategories: p.categories.map(c => ({ id: c.id, name: c.name })),
+            selectedCategoryId: selectedCategory
+          });
+        }
+        return hasCategory;
+      });
+      console.log(`✅ Productos filtrados por categoría ${selectedCategory}: ${beforeFilter} -> ${productsToFilter.length}`);
+      
+      // Si no hay productos, verificar algunos productos para debug
+      if (productsToFilter.length === 0 && productsToFilter.length > 0) {
+        console.log('⚠️ No se encontraron productos. Ejemplo de producto:', {
+          name: productsToFilter[0]?.name,
+          categories: productsToFilter[0]?.categories,
+          hasCategories: !!productsToFilter[0]?.categories,
+          categoriesLength: productsToFilter[0]?.categories?.length || 0
+        });
+      }
+    }
+    
+    // Filtrar por búsqueda si hay término de búsqueda
     if (searchTerm) {
-      const filtered = productsWithStock.filter(p => 
+      const filtered = productsToFilter.filter(p => 
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+        p.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredProducts(filtered);
     } else {
-      setFilteredProducts(productsWithStock);
+      setFilteredProducts(productsToFilter);
     }
-  }, [searchTerm, products]);
+    
+    console.log('✅ Productos finales filtrados:', filteredProducts.length);
+  }, [searchTerm, allProducts, products, selectedCategory]);
 
 
   const addToCart = (product: Product) => {
@@ -66,17 +238,17 @@ export default function PointOfSale() {
     } else {
       const newItem: CartItem = {
         product_id: product.id,
-        product_name: product.name,
+        name: product.name,
         quantity: 1,
-        unit_price: product.price * 1.21, // Precio con IVA para el TPV
-        subtotal: product.price * 1.21,
+        unit_price: (typeof product.price === 'number' ? product.price : parseFloat(product.price)) * 1.21, // Precio con IVA para el TPV
+        subtotal: (typeof product.price === 'number' ? product.price : parseFloat(product.price)) * 1.21,
       };
       setCartItems([...cartItems, newItem]);
       toast.success(`${product.name} agregado al carrito`);
     }
   };
 
-  const updateQuantity = (productId: string, newQuantity: number) => {
+  const updateQuantity = (productId: number, newQuantity: number) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
@@ -164,7 +336,7 @@ export default function PointOfSale() {
       const itemsToInsert = cartItems.map(item => ({
         order_id: order.id,
         product_id: null, // Para ventas directas, no tenemos producto en la BD local
-        name: item.product_name, // Incluir el nombre del producto
+        name: item.name, // Incluir el nombre del producto
         quantity: item.quantity,
         unit_price: parseFloat((item.unit_price / 1.21).toFixed(2)), // Precio sin IVA
         subtotal: parseFloat((item.subtotal / 1.21).toFixed(2)), // Subtotal sin IVA
@@ -181,8 +353,9 @@ export default function PointOfSale() {
       if (itemsError) throw itemsError;
 
       // 3. Actualizar stock de productos en WooCommerce y enviar notificaciones si es necesario
+      const allProductsList = allProducts.length > 0 ? allProducts : products;
       for (const item of cartItems) {
-        const product = products.find(p => p.id === item.product_id);
+        const product = allProductsList.find(p => p.id === item.product_id);
         if (!product) continue;
 
         const oldStock = product.stock;
@@ -256,86 +429,188 @@ export default function PointOfSale() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* PRODUCTOS - 2/3 del espacio */}
+        {/* PRODUCTOS/CATEGORÍAS - 2/3 del espacio */}
         <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Productos Disponibles</CardTitle>
-              <CardDescription>Selecciona productos para agregar al carrito</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>
+                    {selectedCategory !== null ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCategory(null);
+                            setSearchTerm("");
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                        {categories.find(c => c.id === selectedCategory)?.name || "Productos"}
+                      </div>
+                    ) : (
+                      "Categorías"
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    {selectedCategory !== null 
+                      ? "Selecciona productos para agregar al carrito" 
+                      : "Selecciona una categoría para ver sus productos"}
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Buscador */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar producto..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+              {/* Buscador - Solo mostrar cuando hay categoría seleccionada */}
+              {selectedCategory !== null && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar producto..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              )}
 
-              {/* Grid de productos */}
-              {productsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                  <span className="ml-2">Cargando productos...</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[600px] overflow-y-auto">
-                  {filteredProducts.map((product) => {
-                  const isLowStock = product.stock <= 5;
-                  const isVeryLowStock = product.stock <= 2;
-                  
-                  return (
-                    <Card 
-                      key={product.id}
-                      className={`cursor-pointer hover:border-primary hover:shadow-md transition-all ${
-                        isVeryLowStock ? 'border-destructive border-2' : 
-                        isLowStock ? 'border-orange-500' : ''
-                      }`}
-                      onClick={() => addToCart(product)}
-                    >
-                      <CardContent className="p-3 flex flex-col h-full">
-                        <div className="flex-1 space-y-1.5 mb-3">
-                          <h3 className="font-semibold text-sm line-clamp-2 min-h-[40px]">{product.name}</h3>
-                          {product.category && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                              {product.category}
+              {/* Mostrar categorías o productos según el estado */}
+              {selectedCategory === null ? (
+                // VISTA DE CATEGORÍAS
+                (categoriesLoading || loadingAllProducts) ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Cargando categorías y productos...</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[600px] overflow-y-auto">
+                    {categories.map((category) => {
+                      // Contar productos con stock en esta categoría (usar allProducts si está disponible)
+                      const productsToCount = allProducts.length > 0 ? allProducts : products.filter(p => p.stock > 0);
+                      const productsInCategory = productsToCount.filter(p => {
+                        if (p.stock <= 0) return false;
+                        if (!p.categories || p.categories.length === 0) return false;
+                        const hasCategory = p.categories.some(cat => cat.id === category.id);
+                        return hasCategory;
+                      });
+                      
+                      // Solo mostrar categorías que tienen productos o que están cargando
+                      // (para evitar mostrar categorías vacías mientras se cargan)
+                      if (productsInCategory.length === 0 && !loadingAllProducts && allProducts.length > 0) {
+                        // Categoría realmente vacía - opcional: no mostrarla o mostrarla con estilo diferente
+                        return null; // Ocultar categorías sin productos
+                      }
+                      
+                      return (
+                        <Card 
+                          key={category.id}
+                          className={`cursor-pointer hover:border-primary hover:shadow-md transition-all ${
+                            productsInCategory.length === 0 ? 'opacity-50' : ''
+                          }`}
+                          onClick={() => {
+                            console.log(`🖱️ Clic en categoría: ${category.name} (ID: ${category.id})`);
+                            console.log(`📦 Productos en esta categoría: ${productsInCategory.length}`);
+                            setSelectedCategory(category.id);
+                          }}
+                        >
+                          <CardContent className="p-4 flex flex-col items-center justify-center h-full min-h-[120px]">
+                            <Folder className="h-12 w-12 text-primary mb-2" />
+                            <h3 className="font-semibold text-sm text-center line-clamp-2 mb-1">
+                              {category.name}
+                            </h3>
+                            <Badge variant={productsInCategory.length > 0 ? "secondary" : "outline"} className="text-xs">
+                              {productsInCategory.length} {productsInCategory.length === 1 ? 'producto' : 'productos'}
                             </Badge>
-                          )}
-                        </div>
-                        
-                        <div className="space-y-1.5">
-                          <div className="text-xl font-bold text-primary">
-                            {(product.price * 1.21).toFixed(2)}€
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {product.price.toFixed(2)}€ (sin IVA)
-                          </div>
-                          
-                          <div className={`text-xs font-semibold px-2 py-1 rounded-md inline-block ${
-                            isVeryLowStock 
-                              ? 'bg-destructive/10 text-destructive animate-pulse' 
-                              : isLowStock 
-                                ? 'bg-orange-100 text-orange-600'
-                                : 'bg-muted text-muted-foreground'
-                          }`}>
-                            {isVeryLowStock ? '⚠️ ¡ÚLTIMAS! ' : isLowStock ? '⚠️ Poco stock: ' : 'Stock: '}
-                            {product.stock}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-                  
-                  {filteredProducts.length === 0 && !productsLoading && (
-                    <div className="text-center py-12 text-muted-foreground">
-                      No hay productos disponibles
-                    </div>
-                  )}
-                </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    }).filter(Boolean)}
+                    
+                    {categories.length === 0 && !categoriesLoading && (
+                      <div className="col-span-full text-center py-12 text-muted-foreground">
+                        No hay categorías disponibles
+                      </div>
+                    )}
+                  </div>
+                )
+              ) : (
+                // VISTA DE PRODUCTOS DE LA CATEGORÍA SELECCIONADA
+                (productsLoading || loadingAllProducts) ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Cargando productos...</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-[600px] overflow-y-auto">
+                    {filteredProducts.map((product) => {
+                      const isLowStock = product.stock <= 5;
+                      const isVeryLowStock = product.stock <= 2;
+                      const firstImage = product.images && product.images.length > 0 ? product.images[0].src : null;
+                      
+                      return (
+                        <Card 
+                          key={product.id}
+                          className={`cursor-pointer hover:border-primary hover:shadow-md transition-all ${
+                            isVeryLowStock ? 'border-destructive border-2' : 
+                            isLowStock ? 'border-orange-500' : ''
+                          }`}
+                          onClick={() => addToCart(product)}
+                        >
+                          <CardContent className="p-3 flex flex-col h-full">
+                            {/* Imagen del producto */}
+                            {firstImage && (
+                              <div className="relative w-full h-32 overflow-hidden rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center mb-2">
+                                <img 
+                                  src={firstImage} 
+                                  alt={product.images[0].alt || product.name}
+                                  className="max-w-full max-h-full object-contain"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
+                            
+                            <div className="flex-1 space-y-1.5 mb-3">
+                              <h3 className="font-semibold text-sm line-clamp-2 min-h-[40px]">{product.name}</h3>
+                            </div>
+                            
+                            <div className="space-y-1.5">
+                              <div className="text-xl font-bold text-primary">
+                                {(typeof product.price === 'number' ? product.price : parseFloat(product.price)) * 1.21}€
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {(typeof product.price === 'number' ? product.price : parseFloat(product.price)).toFixed(2)}€ (sin IVA)
+                              </div>
+                              
+                              <div className={`text-xs font-semibold px-2 py-1 rounded-md inline-block ${
+                                isVeryLowStock 
+                                  ? 'bg-destructive/10 text-destructive animate-pulse' 
+                                  : isLowStock 
+                                    ? 'bg-orange-100 text-orange-600'
+                                    : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {isVeryLowStock ? '⚠️ ¡ÚLTIMAS! ' : isLowStock ? '⚠️ Poco stock: ' : 'Stock: '}
+                                {product.stock}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                    
+                    {filteredProducts.length === 0 && !productsLoading && (
+                      <div className="col-span-full text-center py-12 text-muted-foreground">
+                        {searchTerm 
+                          ? "No se encontraron productos con ese término de búsqueda" 
+                          : "No hay productos disponibles en esta categoría"}
+                      </div>
+                    )}
+                  </div>
+                )
               )}
             </CardContent>
           </Card>
@@ -369,7 +644,7 @@ export default function PointOfSale() {
                   cartItems.map((item) => (
                     <div key={item.product_id} className="border rounded-lg p-3 space-y-2">
                       <div className="flex justify-between items-start">
-                        <span className="font-medium text-sm">{item.product_name}</span>
+                        <span className="font-medium text-sm">{item.name}</span>
                         <Button
                           variant="ghost"
                           size="sm"

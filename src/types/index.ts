@@ -8,8 +8,8 @@ export interface Product {
   category?: string;
   woocommerce_id?: number;
   description?: string;
+  short_description?: string;
   sku?: string;
-  images?: string[];
   status?: string;
   stock_status?: string;
   stock_quantity?: number;

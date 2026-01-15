@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ interface CustomOrder {
   observations: string | null;
   registration_date: string;
   delivery_date: string | null;
+  status: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -169,6 +171,7 @@ export default function CustomOrders() {
         observations: formData.observations || null,
         registration_date: formData.registration_date,
         delivery_date: formData.delivery_date || null,
+        status: "Procesando", // Valor por defecto al crear
         created_by: user?.id || null,
       };
 
@@ -198,6 +201,22 @@ export default function CustomOrders() {
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Error al guardar el encargo");
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("custom_orders")
+        .update({ status: newStatus })
+        .eq("id", orderId);
+
+      if (error) throw error;
+      toast.success("Estado actualizado correctamente");
+      fetchOrders();
+    } catch (error: any) {
+      console.error(error);
+      toast.error("Error al actualizar estado");
     }
   };
 
@@ -516,38 +535,63 @@ export default function CustomOrders() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Nombre</p>
-                    <p className="text-sm font-semibold">{order.customer_name}</p>
+                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-6">
+                  {/* Información del Encargo */}
+                  <div className="space-y-4 flex-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Nombre</p>
+                        <p className="text-sm font-semibold">{order.customer_name}</p>
+                      </div>
+                      {order.fabric && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Tejido</p>
+                          <p className="text-sm">{order.fabric}</p>
+                        </div>
+                      )}
+                      {order.size && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Talla</p>
+                          <p className="text-sm">{order.size}</p>
+                        </div>
+                      )}
+                      {order.model && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Modelo</p>
+                          <p className="text-sm">{order.model}</p>
+                        </div>
+                      )}
+                    </div>
+                    {order.observations && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Observaciones</p>
+                        <p className="text-sm">{order.observations}</p>
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      Registrado: {formatDate(order.registration_date)}
+                    </div>
                   </div>
-                  {order.fabric && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Tejido</p>
-                      <p className="text-sm">{order.fabric}</p>
+
+                  {/* Controles */}
+                  <div className="flex flex-col sm:flex-row xl:flex-col gap-4 xl:min-w-[240px]">
+                    {/* Estado del Encargo */}
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-muted-foreground">Estado</p>
+                      <Select 
+                        value={order.status || "Procesando"} 
+                        onValueChange={(value) => updateOrderStatus(order.id, value)}
+                      >
+                        <SelectTrigger className="w-full h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Procesando">Procesando</SelectItem>
+                          <SelectItem value="Completado">Completado</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
-                  {order.size && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Talla</p>
-                      <p className="text-sm">{order.size}</p>
-                    </div>
-                  )}
-                  {order.model && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Modelo</p>
-                      <p className="text-sm">{order.model}</p>
-                    </div>
-                  )}
-                </div>
-                {order.observations && (
-                  <div className="mt-4 p-3 bg-muted rounded-lg">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Observaciones</p>
-                    <p className="text-sm">{order.observations}</p>
                   </div>
-                )}
-                <div className="mt-4 text-xs text-muted-foreground">
-                  Registrado: {formatDate(order.registration_date)}
                 </div>
               </CardContent>
             </Card>

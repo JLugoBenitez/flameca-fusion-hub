@@ -20,8 +20,26 @@ serve(async (req) => {
       throw new Error('WooCommerce credentials not configured');
     }
 
-    const { action, productId, productData, params, limit } = await req.json();
-    console.log('Action:', action, 'ProductId:', productId);
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (err) {
+      console.error('❌ Error al parsear JSON del request:', err);
+      throw new Error(`Error al parsear request body: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+    
+    const { action, productId, productData, params, limit } = requestBody;
+    console.log('📥 Request recibido:', { action, hasParams: !!params, paramsType: typeof params });
+    
+    // Validar que params existe para acciones que lo requieren
+    if ((action === 'get_categories' || action === 'list') && params === undefined) {
+      console.warn('⚠️ Params no definido, usando valores por defecto');
+    }
+    
+    // Validar que action existe
+    if (!action) {
+      throw new Error('Action is required');
+    }
 
     let endpoint = '';
     let method = 'GET';
@@ -37,7 +55,23 @@ serve(async (req) => {
         const page = params?.page || 1;
         const perPage = params?.per_page || 20;
         const search = params?.search || '';
-        endpoint = `/wp-json/wc/v3/products?page=${page}&per_page=${perPage}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
+        const category = params?.category;
+        const stockStatus = params?.stock_status || '';
+        
+        let queryParams = [];
+        if (search) queryParams.push(`search=${encodeURIComponent(search)}`);
+        if (category !== undefined && category !== null && category !== '') {
+          // WooCommerce espera el ID de categoría como número (sin encodeURIComponent para números)
+          const categoryId = typeof category === 'number' ? category : parseInt(String(category));
+          if (!isNaN(categoryId) && categoryId > 0) {
+            queryParams.push(`category=${categoryId}`);
+          }
+        }
+        if (stockStatus) queryParams.push(`stock_status=${encodeURIComponent(stockStatus)}`);
+        
+        const queryString = queryParams.length > 0 ? `&${queryParams.join('&')}` : '';
+        endpoint = `/wp-json/wc/v3/products?page=${page}&per_page=${perPage}${queryString}`;
+        console.log('📦 Filtros aplicados:', { page, perPage, search, category, stockStatus, endpoint, queryString });
         break;
       
       case 'get':
@@ -64,13 +98,29 @@ serve(async (req) => {
         body = JSON.stringify(productData);
         break;
       
+      case 'get_categories':
+        try {
+          const catPage = (params && typeof params === 'object' && 'page' in params) ? Number(params.page) || 1 : 1;
+          const catPerPage = (params && typeof params === 'object' && 'per_page' in params) ? Number(params.per_page) || 100 : 100;
+          endpoint = `/wp-json/wc/v3/products/categories?page=${catPage}&per_page=${catPerPage}&orderby=name&order=asc`;
+          console.log('📦 Obteniendo categorías:', { catPage, catPerPage, endpoint, paramsType: typeof params, params });
+        } catch (err) {
+          console.error('❌ Error en get_categories case:', err);
+          throw new Error(`Error al procesar get_categories: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        }
+        break;
+      
       default:
         throw new Error('Invalid action');
     }
 
     // Build the full URL
+    if (!endpoint) {
+      throw new Error(`Endpoint no definido para la acción: ${action}`);
+    }
+    
     const url = `${storeUrl}${endpoint}`;
-    console.log('Calling WooCommerce:', method, endpoint);
+    console.log('🌐 Calling WooCommerce:', { method, endpoint, url: url.substring(0, 100) + '...' });
 
     // Create Basic Auth header
     const auth = btoa(`${consumerKey}:${consumerSecret}`);
@@ -90,7 +140,8 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('WooCommerce API Error:', response.status, errorText);
-      throw new Error(`WooCommerce API error: ${response.status}`);
+      console.error('URL que falló:', url);
+      throw new Error(`WooCommerce API error: ${response.status} - ${errorText.substring(0, 200)}`);
     }
 
     const data = await response.json();
@@ -99,9 +150,28 @@ serve(async (req) => {
     const totalCount = response.headers.get('X-WP-Total');
     const totalPages = response.headers.get('X-WP-TotalPages');
 
+    // Log para depuración de categorías
+    if (action === 'get_categories') {
+      console.log('📦 Categorías obtenidas de WooCommerce:', {
+        count: Array.isArray(data) ? data.length : 'No es array',
+        isArray: Array.isArray(data),
+        dataType: typeof data,
+        firstItem: Array.isArray(data) && data.length > 0 ? {
+          id: data[0].id,
+          name: data[0].name,
+          slug: data[0].slug
+        } : null,
+        totalCount,
+        totalPages
+      });
+    }
+
+    // Asegurar que data sea un array
+    const responseData = Array.isArray(data) ? data : (data ? [data] : []);
+    
     return new Response(
       JSON.stringify({ 
-        data,
+        data: responseData,
         pagination: totalCount ? {
           total: parseInt(totalCount),
           totalPages: parseInt(totalPages || '1')
@@ -111,26 +181,41 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in woocommerce-products function:', error);
+    console.error('❌ Error in woocommerce-products function:', error);
+    console.error('Error type:', typeof error);
+    console.error('Error instanceof Error:', error instanceof Error);
     
     // Manejar errores específicos de conexión
     let errorMessage = 'Unknown error occurred';
     let statusCode = 500;
+    let errorDetails: any = {};
     
     if (error instanceof Error) {
       errorMessage = error.message;
+      errorDetails = {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      };
       
       // Si es un error de conexión, devolver un error más específico
       if (error.message.includes('connection error') || error.message.includes('fetch')) {
         errorMessage = 'Error de conexión con WooCommerce. Verifica la URL y las credenciales.';
         statusCode = 503; // Service Unavailable
       }
+    } else {
+      errorDetails = {
+        error: String(error),
+        type: typeof error
+      };
     }
+    
+    console.error('📤 Enviando respuesta de error:', { errorMessage, statusCode, errorDetails });
     
     return new Response(
       JSON.stringify({ 
         error: errorMessage,
-        details: error instanceof Error ? error.stack : undefined
+        details: errorDetails
       }),
       { 
         status: statusCode,

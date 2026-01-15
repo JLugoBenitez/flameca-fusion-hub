@@ -58,10 +58,8 @@ const REPAIR_TYPES = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: "pending", label: "Pendiente", color: "bg-yellow-500" },
-  { value: "in_progress", label: "En Proceso", color: "bg-blue-500" },
-  { value: "completed", label: "Completado", color: "bg-green-500" },
-  { value: "cancelled", label: "Cancelado", color: "bg-red-500" },
+  { value: "Procesando", label: "Procesando", color: "bg-blue-500" },
+  { value: "Completado", label: "Completado", color: "bg-green-500" },
 ];
 
 export default function SuitRepairs() {
@@ -86,7 +84,6 @@ export default function SuitRepairs() {
     observations: "",
     registration_date: new Date().toISOString(),
     delivery_date: "",
-    status: "pending",
     price: "",
   });
 
@@ -171,7 +168,6 @@ export default function SuitRepairs() {
         observations: repair.observations || "",
         registration_date: repair.registration_date,
         delivery_date: repair.delivery_date || "",
-        status: repair.status,
         price: repair.price?.toString() || "",
       });
       await fetchRepairFiles(repair.id);
@@ -189,7 +185,6 @@ export default function SuitRepairs() {
         observations: "",
         registration_date: new Date().toISOString(),
         delivery_date: "",
-        status: "pending",
         price: "",
       });
     }
@@ -209,7 +204,7 @@ export default function SuitRepairs() {
         observations: formData.observations || null,
         registration_date: formData.registration_date,
         delivery_date: formData.delivery_date || null,
-        status: formData.status,
+        status: "Procesando", // Valor por defecto al crear
         price: formData.price ? parseFloat(formData.price) : 0,
         created_by: user?.id || null,
       };
@@ -240,6 +235,22 @@ export default function SuitRepairs() {
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || "Error al guardar el arreglo");
+    }
+  };
+
+  const updateRepairStatus = async (repairId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("suit_repairs")
+        .update({ status: newStatus })
+        .eq("id", repairId);
+
+      if (error) throw error;
+      toast.success("Estado actualizado correctamente");
+      fetchRepairs();
+    } catch (error: any) {
+      console.error(error);
+      toast.error("Error al actualizar estado");
     }
   };
 
@@ -284,7 +295,6 @@ export default function SuitRepairs() {
       observations: "",
       registration_date: new Date().toISOString(),
       delivery_date: "",
-      status: "pending",
       price: "",
     });
   };
@@ -486,26 +496,6 @@ export default function SuitRepairs() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="status">Estado *</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status.value} value={status.value}>
-                          {status.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
                   {editingRepair && editingRepair.id ? (
                     <FileUpload
                       orderId={editingRepair.id}
@@ -655,38 +645,66 @@ export default function SuitRepairs() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Cliente</p>
-                    <p className="text-sm font-semibold">{repair.customer_name}</p>
+                <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-6">
+                  {/* Información del Arreglo */}
+                  <div className="space-y-4 flex-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Cliente</p>
+                        <p className="text-sm font-semibold">{repair.customer_name}</p>
+                      </div>
+                      {repair.garment_type && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Tipo de Prenda</p>
+                          <p className="text-sm">{repair.garment_type}</p>
+                        </div>
+                      )}
+                      {repair.repair_type && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Tipo de Arreglo</p>
+                          <p className="text-sm">{repair.repair_type}</p>
+                        </div>
+                      )}
+                      {repair.size && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Talla</p>
+                          <p className="text-sm">{repair.size}</p>
+                        </div>
+                      )}
+                    </div>
+                    {repair.observations && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Observaciones</p>
+                        <p className="text-sm">{repair.observations}</p>
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">
+                      Registrado: {formatDate(repair.registration_date)}
+                    </div>
                   </div>
-                  {repair.garment_type && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Tipo de Prenda</p>
-                      <p className="text-sm">{repair.garment_type}</p>
+
+                  {/* Controles */}
+                  <div className="flex flex-col sm:flex-row xl:flex-col gap-4 xl:min-w-[240px]">
+                    {/* Estado del Arreglo */}
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-muted-foreground">Estado</p>
+                      <Select 
+                        value={repair.status || "Procesando"} 
+                        onValueChange={(value) => updateRepairStatus(repair.id, value)}
+                      >
+                        <SelectTrigger className="w-full h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
-                  {repair.repair_type && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Tipo de Arreglo</p>
-                      <p className="text-sm">{repair.repair_type}</p>
-                    </div>
-                  )}
-                  {repair.size && (
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Talla</p>
-                      <p className="text-sm">{repair.size}</p>
-                    </div>
-                  )}
-                </div>
-                {repair.observations && (
-                  <div className="mt-4 p-3 bg-muted rounded-lg">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Observaciones</p>
-                    <p className="text-sm">{repair.observations}</p>
                   </div>
-                )}
-                <div className="mt-4 text-xs text-muted-foreground">
-                  Registrado: {formatDate(repair.registration_date)}
                 </div>
               </CardContent>
             </Card>

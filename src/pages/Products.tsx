@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Package, RefreshCw, Search, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, Package, RefreshCw, Search, Loader2, X, Filter, Check } from "lucide-react";
 import { Product } from "@/types";
 import { useWooCommerceProducts } from "@/hooks/useWooCommerceProducts";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
@@ -29,13 +30,21 @@ export default function Products() {
     totalPages,
     totalProducts,
     productsPerPage,
+    stockStats,
+    fetchStockStats,
+    categories,
+    categoriesLoading,
+    fetchCategories,
     goToPage,
     nextPage,
     prevPage
   } = useWooCommerceProducts();
   const { notifyLowStock, notifyOutOfStock } = useAutoNotifications();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "in-stock" | "low-stock" | "very-low-stock" | "out-of-stock">("all");
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -51,45 +60,92 @@ export default function Products() {
     manage_stock: false,
   });
 
-  // Filtrar productos por término de búsqueda y estado de stock
-  const filteredProducts = useMemo(() => {
-    let filtered = products;
-    
-    // Filtro por búsqueda
-    if (searchTerm) {
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  // Debounce para la búsqueda
+  useEffect(() => {
+    // Limpiar timeout anterior
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
-    
-    // Filtro por estado de stock
-    if (stockFilter !== "all") {
-      filtered = filtered.filter(product => {
-        const stock = product.stock_quantity || 0;
-        switch (stockFilter) {
-          case "in-stock":
-            return stock > 5;
-          case "low-stock":
-            return stock > 2 && stock <= 5;
-          case "very-low-stock":
-            return stock > 0 && stock <= 2;
-          case "out-of-stock":
-            return stock === 0;
-          default:
-            return true;
-        }
-      });
-    }
-    
-    return filtered;
-  }, [products, searchTerm, stockFilter]);
 
-  const handleSearch = () => {
-    // La búsqueda se maneja automáticamente por el filtro
-    // No necesitamos hacer una nueva llamada a la API
+    // Crear nuevo timeout
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms de debounce
+
+    // Cleanup
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchTerm]);
+
+  // Construir parámetros de filtro para el backend
+  const buildFilterParams = useCallback(() => {
+    const params: { search?: string; category?: number; stock_status?: string; stockFilter?: string } = {};
+    
+    if (debouncedSearchTerm.trim()) {
+      params.search = debouncedSearchTerm.trim();
+    }
+    
+    if (selectedCategory !== null) {
+      params.category = selectedCategory;
+    }
+    
+    // Mapear filtros de stock
+    if (stockFilter === "out-of-stock") {
+      params.stock_status = "outofstock";
+    } else if (stockFilter !== "all") {
+      // Para filtros específicos (in-stock, low-stock, very-low-stock), pasamos el stockFilter
+      // para que el hook obtenga todos los productos y los filtre globalmente
+      params.stockFilter = stockFilter;
+      params.stock_status = "instock"; // Base para obtener productos con stock
+    }
+    
+    return params;
+  }, [debouncedSearchTerm, selectedCategory, stockFilter]);
+
+  // Buscar productos cuando cambia el término de búsqueda, categoría o stock
+  useEffect(() => {
+    const params = buildFilterParams();
+    console.log('🔍 Aplicando filtros:', params);
+    console.log('📋 Estado actual:', { 
+      selectedCategory, 
+      stockFilter, 
+      debouncedSearchTerm,
+      params 
+    });
+    fetchProducts(1, params);
+  }, [debouncedSearchTerm, selectedCategory, stockFilter, fetchProducts, buildFilterParams]);
+
+  // Funciones de paginación que mantienen todos los filtros
+  const handleGoToPage = (page: number) => {
+    const params = buildFilterParams();
+    fetchProducts(page, params);
   };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      const params = buildFilterParams();
+      fetchProducts(currentPage + 1, params);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      const params = buildFilterParams();
+      fetchProducts(currentPage - 1, params);
+    }
+  };
+
+  const handleRefetch = () => {
+    const params = buildFilterParams();
+    fetchProducts(currentPage, params);
+  };
+
+  // Los productos ya vienen filtrados del backend/hook según los filtros aplicados
+  // No necesitamos filtrar adicionalmente aquí
+  const filteredProducts = products;
 
   // Crear o actualizar producto directamente en WooCommerce
   const handleSubmit = async (e: React.FormEvent) => {
@@ -161,7 +217,8 @@ export default function Products() {
 
       setDialogOpen(false);
       resetForm();
-      refetch();
+      handleRefetch();
+      fetchStockStats(); // Actualizar estadísticas globales después de editar
     } catch (error: any) {
       console.error('Error saving product:', error);
       toast.error("Error al guardar producto en WooCommerce: " + error.message);
@@ -189,7 +246,8 @@ export default function Products() {
 
       console.log('Delete response:', data);
       toast.success(`Producto "${deleteProduct.name}" eliminado de WooCommerce`);
-      refetch();
+      handleRefetch();
+      fetchStockStats(); // Actualizar estadísticas globales después de eliminar
     } catch (error: any) {
       console.error('Error deleting product:', error);
       toast.error("Error al eliminar producto de WooCommerce: " + error.message);
@@ -240,7 +298,7 @@ export default function Products() {
           <p className="text-muted-foreground">Gestiona tu catálogo de productos</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={refetch}>
+          <Button variant="outline" onClick={() => { handleRefetch(); fetchStockStats(); }}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Actualizar
           </Button>
@@ -358,7 +416,7 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Estadísticas de Stock */}
+      {/* Estadísticas de Stock - Globales de toda la tienda */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="border-green-500/30 bg-green-500/10 dark:bg-green-500/20 dark:border-green-400/50">
           <CardContent className="p-4">
@@ -367,7 +425,11 @@ export default function Products() {
               <span className="text-sm font-medium text-green-700 dark:text-green-300">En Stock</span>
             </div>
             <div className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-              {(products.filter(p => (p.stock_quantity || 0) > 5)).length}
+              {stockStats.loading ? (
+                <Loader2 className="h-6 w-6 animate-spin inline-block" />
+              ) : (
+                stockStats.inStock
+              )}
             </div>
           </CardContent>
         </Card>
@@ -379,7 +441,11 @@ export default function Products() {
               <span className="text-sm font-medium text-orange-700 dark:text-orange-300">Poco Stock</span>
             </div>
             <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">
-              {(products.filter(p => { const stock = p.stock_quantity || 0; return stock > 2 && stock <= 5; })).length}
+              {stockStats.loading ? (
+                <Loader2 className="h-6 w-6 animate-spin inline-block" />
+              ) : (
+                stockStats.lowStock
+              )}
             </div>
           </CardContent>
         </Card>
@@ -391,7 +457,11 @@ export default function Products() {
               <span className="text-sm font-medium text-red-700 dark:text-red-300">¡Últimas!</span>
             </div>
             <div className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-              {(products.filter(p => { const stock = p.stock_quantity || 0; return stock > 0 && stock <= 2; })).length}
+              {stockStats.loading ? (
+                <Loader2 className="h-6 w-6 animate-spin inline-block" />
+              ) : (
+                stockStats.veryLowStock
+              )}
             </div>
           </CardContent>
         </Card>
@@ -403,7 +473,11 @@ export default function Products() {
               <span className="text-sm font-medium text-destructive dark:text-red-300">Agotados</span>
             </div>
             <div className="text-2xl font-bold text-destructive dark:text-red-400 mt-1">
-              {(products.filter(p => (p.stock_quantity || 0) === 0)).length}
+              {stockStats.loading ? (
+                <Loader2 className="h-6 w-6 animate-spin inline-block" />
+              ) : (
+                stockStats.outOfStock
+              )}
             </div>
           </CardContent>
         </Card>
@@ -415,18 +489,30 @@ export default function Products() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar productos por nombre, SKU o categoría..."
+              placeholder="Buscar productos por nombre, SKU o categoría (búsqueda global en todas las páginas)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-10"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Limpiar búsqueda"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            {loading && debouncedSearchTerm && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+            )}
           </div>
           <Button 
             variant="outline" 
-            onClick={refetch} 
-            disabled={loading}
+            onClick={() => { handleRefetch(); fetchStockStats(); }} 
+            disabled={loading || stockStats.loading}
           >
-            {loading ? (
+            {loading || stockStats.loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
@@ -435,47 +521,172 @@ export default function Products() {
           </Button>
         </div>
         
-        {/* Filtros de Stock */}
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant={stockFilter === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStockFilter("all")}
-          >
-            Todos ({totalProducts > 0 ? totalProducts : products.length})
-          </Button>
-          <Button
-            variant={stockFilter === "in-stock" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStockFilter("in-stock")}
-            className="border-green-500 text-green-600 hover:bg-green-50"
-          >
-            ✅ En Stock ({(products.filter(p => (p.stock_quantity || 0) > 5)).length})
-          </Button>
-          <Button
-            variant={stockFilter === "low-stock" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStockFilter("low-stock")}
-            className="border-orange-500 text-orange-600 hover:bg-orange-50"
-          >
-            ⚠️ Poco Stock ({(products.filter(p => { const stock = p.stock_quantity || 0; return stock > 2 && stock <= 5; })).length})
-          </Button>
-          <Button
-            variant={stockFilter === "very-low-stock" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStockFilter("very-low-stock")}
-            className="border-red-500 text-red-600 hover:bg-red-50"
-          >
-            🚨 ¡Últimas! ({(products.filter(p => { const stock = p.stock_quantity || 0; return stock > 0 && stock <= 2; })).length})
-          </Button>
-          <Button
-            variant={stockFilter === "out-of-stock" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStockFilter("out-of-stock")}
-            className="border-destructive text-destructive hover:bg-destructive/10"
-          >
-            ❌ Agotados ({(products.filter(p => (p.stock_quantity || 0) === 0)).length})
-          </Button>
+        {/* Menú de Filtros */}
+        <div className="flex gap-2 flex-wrap items-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtrar
+                {(stockFilter !== "all" || selectedCategory !== null) && (
+                  <span className="ml-2 h-2 w-2 rounded-full bg-primary"></span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56 max-h-[400px] overflow-y-auto">
+              <DropdownMenuLabel>Filtros</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              
+              {/* Submenú de Categorías */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <span>Categorías</span>
+                  {selectedCategory !== null && (
+                    <span className="ml-2 h-2 w-2 rounded-full bg-primary"></span>
+                  )}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="max-h-[300px] overflow-y-auto">
+                  <DropdownMenuItem
+                    onClick={() => setSelectedCategory(null)}
+                    className={selectedCategory === null ? "bg-accent" : ""}
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${selectedCategory === null ? "opacity-100" : "opacity-0"}`} />
+                    Todas las categorías
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {categoriesLoading ? (
+                    <DropdownMenuItem disabled>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Cargando categorías...
+                    </DropdownMenuItem>
+                  ) : categories.length === 0 ? (
+                    <DropdownMenuItem disabled>
+                      {categoriesLoading ? 'Cargando...' : 'No hay categorías disponibles'}
+                    </DropdownMenuItem>
+                  ) : (
+                    categories.map((category) => {
+                      // Verificar que la categoría tenga la estructura correcta
+                      if (!category || !category.id || !category.name) {
+                        console.warn('Categoría inválida:', category);
+                        return null;
+                      }
+                      return (
+                        <DropdownMenuItem
+                          key={category.id}
+                          onClick={() => setSelectedCategory(category.id)}
+                          className={selectedCategory === category.id ? "bg-accent" : ""}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedCategory === category.id ? "opacity-100" : "opacity-0"}`} />
+                          {category.name}
+                        </DropdownMenuItem>
+                      );
+                    }).filter(Boolean)
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              
+              <DropdownMenuSeparator />
+              
+              {/* Submenú de Stock */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <span>Stock</span>
+                  {stockFilter !== "all" && (
+                    <span className="ml-2 h-2 w-2 rounded-full bg-primary"></span>
+                  )}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem
+                    onClick={() => setStockFilter("all")}
+                    className={stockFilter === "all" ? "bg-accent" : ""}
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${stockFilter === "all" ? "opacity-100" : "opacity-0"}`} />
+                    Todos ({totalProducts > 0 ? totalProducts : products.length})
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setStockFilter("in-stock")}
+                    className={stockFilter === "in-stock" ? "bg-accent" : ""}
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${stockFilter === "in-stock" ? "opacity-100" : "opacity-0"}`} />
+                    <span className="text-green-600">✅ En Stock</span>
+                    <span className="ml-auto text-sm text-muted-foreground">({stockStats.inStock})</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setStockFilter("low-stock")}
+                    className={stockFilter === "low-stock" ? "bg-accent" : ""}
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${stockFilter === "low-stock" ? "opacity-100" : "opacity-0"}`} />
+                    <span className="text-orange-600">⚠️ Poco Stock</span>
+                    <span className="ml-auto text-sm text-muted-foreground">({stockStats.lowStock})</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setStockFilter("very-low-stock")}
+                    className={stockFilter === "very-low-stock" ? "bg-accent" : ""}
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${stockFilter === "very-low-stock" ? "opacity-100" : "opacity-0"}`} />
+                    <span className="text-red-600">🚨 ¡Últimas!</span>
+                    <span className="ml-auto text-sm text-muted-foreground">({stockStats.veryLowStock})</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setStockFilter("out-of-stock")}
+                    className={stockFilter === "out-of-stock" ? "bg-accent" : ""}
+                  >
+                    <Check className={`mr-2 h-4 w-4 ${stockFilter === "out-of-stock" ? "opacity-100" : "opacity-0"}`} />
+                    <span className="text-destructive">❌ Agotados</span>
+                    <span className="ml-auto text-sm text-muted-foreground">({stockStats.outOfStock})</span>
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+              
+              <DropdownMenuSeparator />
+              
+              {/* Limpiar filtros */}
+              {(stockFilter !== "all" || selectedCategory !== null) && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setStockFilter("all");
+                      setSelectedCategory(null);
+                    }}
+                  >
+                    Limpiar todos los filtros
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          {/* Mostrar filtros activos como badges */}
+          {(stockFilter !== "all" || selectedCategory !== null) && (
+            <div className="flex gap-2 flex-wrap">
+              {selectedCategory !== null && (
+                <Badge variant="secondary" className="gap-1">
+                  {categories.find(c => c.id === selectedCategory)?.name || "Categoría"}
+                  <button
+                    onClick={() => setSelectedCategory(null)}
+                    className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+              {stockFilter !== "all" && (
+                <Badge variant="secondary" className="gap-1">
+                  {stockFilter === "in-stock" && "✅ En Stock"}
+                  {stockFilter === "low-stock" && "⚠️ Poco Stock"}
+                  {stockFilter === "very-low-stock" && "🚨 ¡Últimas!"}
+                  {stockFilter === "out-of-stock" && "❌ Agotados"}
+                  <button
+                    onClick={() => setStockFilter("all")}
+                    className="ml-1 hover:bg-destructive/20 rounded-full p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -484,6 +695,7 @@ export default function Products() {
           // Skeleton loading
           [...Array(6)].map((_, i) => (
             <Card key={i} className="shadow-md">
+              <Skeleton className="w-full h-64 rounded-t-lg" />
               <CardHeader>
                 <Skeleton className="h-6 w-3/4 mb-2" />
                 <Skeleton className="h-4 w-1/2" />
@@ -504,8 +716,21 @@ export default function Products() {
             <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No se encontraron productos</h3>
             <p className="text-muted-foreground">
-              {searchTerm ? "Intenta con otros términos de búsqueda" : "No hay productos disponibles"}
+              {debouncedSearchTerm 
+                ? `No se encontraron productos que coincidan con "${debouncedSearchTerm}". Intenta con otros términos de búsqueda.` 
+                : stockFilter !== "all"
+                  ? `No hay productos con el filtro de stock seleccionado.`
+                  : "No hay productos disponibles"}
             </p>
+            {debouncedSearchTerm && (
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => setSearchTerm("")}
+              >
+                Limpiar búsqueda
+              </Button>
+            )}
           </div>
         ) : (
           filteredProducts.map((product) => {
@@ -513,6 +738,8 @@ export default function Products() {
             const isLowStock = stock <= 5;
             const isVeryLowStock = stock <= 2;
             const isOutOfStock = stock === 0;
+            
+            const firstImage = product.images && product.images.length > 0 ? product.images[0].src : null;
             
             return (
             <Card 
@@ -524,6 +751,20 @@ export default function Products() {
                 'hover:border-primary'
               }`}
             >
+              {/* Imagen del producto */}
+              {firstImage && (
+                <div className="relative w-full h-64 overflow-hidden rounded-t-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+                  <img 
+                    src={firstImage} 
+                    alt={product.images[0].alt || product.name}
+                    className="max-w-full max-h-full object-contain"
+                    onError={(e) => {
+                      // Si la imagen falla al cargar, ocultar el contenedor
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
               <CardHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <div className={`p-2 rounded-lg ${
@@ -644,7 +885,7 @@ export default function Products() {
             <PaginationContent>
               <PaginationItem>
                 <PaginationPrevious 
-                  onClick={prevPage} 
+                  onClick={handlePrevPage} 
                   className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
@@ -665,7 +906,7 @@ export default function Products() {
                 return (
                   <PaginationItem key={pageNum}>
                     <PaginationLink
-                      onClick={() => goToPage(pageNum)}
+                      onClick={() => handleGoToPage(pageNum)}
                       isActive={currentPage === pageNum}
                       className="cursor-pointer"
                     >
@@ -683,7 +924,7 @@ export default function Products() {
               
               <PaginationItem>
                 <PaginationNext 
-                  onClick={nextPage} 
+                  onClick={handleNextPage} 
                   className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
                 />
               </PaginationItem>
