@@ -1,10 +1,10 @@
 // Constantes de la aplicación
 
 export const APP_CONFIG = {
-  name: 'Flamenca Store',
+  name: 'La Boutique Flamenca',
   description: 'Gestión integral para tu tienda de trajes de flamenca',
   version: '1.0.0',
-  author: 'Flamenca Store Team',
+  author: 'La Boutique Flamenca',
 } as const;
 
 export const API_CONFIG = {

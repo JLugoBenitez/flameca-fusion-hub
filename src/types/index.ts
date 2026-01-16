@@ -118,6 +118,29 @@ export interface CartItem {
   subtotal: number;
 }
 
+export interface Variation {
+  id: number;
+  product_id: number;
+  sku?: string;
+  price: string;
+  regular_price?: string;
+  sale_price?: string;
+  stock_quantity?: number;
+  stock_status?: string;
+  attributes?: Array<{
+    id: number;
+    name: string;
+    option: string;
+  }>;
+  image?: {
+    id: number;
+    src: string;
+    name: string;
+    alt: string;
+  };
+  description?: string;
+}
+
 export interface DashboardStats {
   products: number;
   orders: number;

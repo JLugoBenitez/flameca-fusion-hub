@@ -12,11 +12,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, Edit, Trash2, Package, RefreshCw, Search, Loader2, X, Filter, Check } from "lucide-react";
+import { Plus, Edit, Trash2, Package, RefreshCw, Search, Loader2, X, Filter, Check, Tag, ChevronDown, ChevronUp } from "lucide-react";
 import { Product } from "@/types";
 import { useWooCommerceProducts } from "@/hooks/useWooCommerceProducts";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { PermissionGate } from "@/components/PermissionGate";
+import { useProductVariations } from "@/hooks/useProductVariations";
+import { useProductLabel } from "@/hooks/useProductLabel";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 
 export default function Products() {
@@ -40,6 +42,8 @@ export default function Products() {
     prevPage
   } = useWooCommerceProducts();
   const { notifyLowStock, notifyOutOfStock } = useAutoNotifications();
+  const { fetchVariations, loading: loadingVariations } = useProductVariations();
+  const { generateLabel, generateMultipleLabels, isGenerating: isGeneratingLabel } = useProductLabel();
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState<"all" | "in-stock" | "low-stock" | "very-low-stock" | "out-of-stock">("all");
@@ -49,6 +53,8 @@ export default function Products() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
+  const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
+  const [productVariationsCache, setProductVariationsCache] = useState<Record<number, any[]>>({});
   const [formData, setFormData] = useState({
     name: "",
     regular_price: "",
@@ -222,6 +228,49 @@ export default function Products() {
     } catch (error: any) {
       console.error('Error saving product:', error);
       toast.error("Error al guardar producto en WooCommerce: " + error.message);
+    }
+  };
+
+  // Generar etiquetas para un producto
+  const handleGenerateLabels = async (product: Product) => {
+    try {
+      // Verificar si el producto tiene variaciones
+      const hasVariations = product.variations && Array.isArray(product.variations) && product.variations.length > 0;
+      
+      if (hasVariations) {
+        // Obtener todas las variaciones
+        toast.loading("Obteniendo variaciones del producto...");
+        const variations = await fetchVariations(product.woocommerce_id || product.id);
+        
+        if (variations.length === 0) {
+          toast.dismiss();
+          toast.error("No se encontraron variaciones para este producto");
+          return;
+        }
+        
+        toast.dismiss();
+        toast.loading(`Generando ${variations.length} etiquetas...`);
+        
+        // Generar etiqueta para cada variación
+        const labelsData = variations.map(variation => ({
+          product,
+          variation,
+          barcode: `VAR-${variation.id}`
+        }));
+        
+        await generateMultipleLabels(labelsData);
+        toast.dismiss();
+      } else {
+        // Producto sin variaciones - generar una sola etiqueta
+        toast.loading("Generando etiqueta...");
+        await generateLabel({
+          product,
+          barcode: `PROD-${product.woocommerce_id || product.id}`
+        });
+        toast.dismiss();
+      }
+    } catch (error: any) {
+      toast.error("Error al generar etiquetas: " + (error.message || "Error desconocido"));
     }
   };
 
@@ -734,12 +783,50 @@ export default function Products() {
           </div>
         ) : (
           filteredProducts.map((product) => {
-            const stock = product.stock_quantity || 0;
+            // Verificar si tiene variaciones
+            const hasVariations = product.variations && Array.isArray(product.variations) && product.variations.length > 0;
+            const isExpanded = expandedProducts.has(product.id);
+            
+            // Si tiene variaciones, calcular stock total desde las variaciones en caché
+            let stock = product.stock_quantity || 0;
+            if (hasVariations && productVariationsCache[product.id]) {
+              stock = productVariationsCache[product.id].reduce((sum, v) => sum + (v.stock_quantity || 0), 0);
+            }
+            
             const isLowStock = stock <= 5;
             const isVeryLowStock = stock <= 2;
             const isOutOfStock = stock === 0;
             
             const firstImage = product.images && product.images.length > 0 ? product.images[0].src : null;
+            
+            // Función para cargar variaciones si no están en caché
+            const loadVariations = async () => {
+              if (productVariationsCache[product.id]) return;
+              
+              try {
+                const variations = await fetchVariations(product.woocommerce_id || product.id);
+                setProductVariationsCache(prev => ({
+                  ...prev,
+                  [product.id]: variations
+                }));
+              } catch (error) {
+                console.error('Error cargando variaciones:', error);
+              }
+            };
+            
+            // Función para toggle expandir
+            const toggleExpand = () => {
+              if (!isExpanded) {
+                loadVariations();
+                setExpandedProducts(prev => new Set([...prev, product.id]));
+              } else {
+                setExpandedProducts(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(product.id);
+                  return newSet;
+                });
+              }
+            };
             
             return (
             <Card 
@@ -776,9 +863,31 @@ export default function Products() {
                     <Package className="h-5 w-5 text-white" />
                   </div>
                   <CardTitle className="text-lg">{product.name}</CardTitle>
+                  {hasVariations && (
+                    <Badge variant="outline" className="ml-2">
+                      {product.variations?.length || 0} variaciones
+                    </Badge>
+                  )}
                 </div>
                 {product.short_description && (
                   <CardDescription className="line-clamp-2">{product.short_description}</CardDescription>
+                )}
+                {hasVariations && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleExpand}
+                    className="mt-2 w-full justify-between"
+                  >
+                    <span className="text-xs">
+                      {isExpanded ? 'Ocultar' : 'Ver'} variaciones (tallas/colores)
+                    </span>
+                    {isExpanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
                 )}
               </CardHeader>
               <CardContent>
@@ -843,9 +952,55 @@ export default function Products() {
                       <span>{product.categories[0].name}</span>
                     </div>
                   )}
+                  
+                  {/* Mostrar variaciones si está expandido */}
+                  {hasVariations && isExpanded && productVariationsCache[product.id] && (
+                    <div className="mt-4 pt-4 border-t space-y-2">
+                      <div className="text-xs font-semibold text-muted-foreground mb-2">
+                        Variaciones disponibles:
+                      </div>
+                      {productVariationsCache[product.id].map((variation) => {
+                        const varStock = variation.stock_quantity || 0;
+                        const varAttributes = variation.attributes?.map(a => `${a.name}: ${a.option}`).join(', ') || 'Sin atributos';
+                        const varPrice = parseFloat(variation.price || variation.regular_price || '0');
+                        
+                        return (
+                          <div 
+                            key={variation.id} 
+                            className="p-2 bg-muted rounded-md text-xs space-y-1"
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">{varAttributes}</span>
+                              <Badge variant={varStock > 0 ? "secondary" : "destructive"} className="text-xs">
+                                {varStock > 0 ? `Stock: ${varStock}` : 'Sin stock'}
+                              </Badge>
+                            </div>
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>SKU: {variation.sku || 'N/A'}</span>
+                              <span>{(varPrice * 1.21).toFixed(2)}€</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </CardContent>
-              <CardFooter className="flex gap-2">
+              <CardFooter className="flex gap-2 flex-wrap">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleGenerateLabels(product)} 
+                  disabled={isGeneratingLabel || loadingVariations}
+                  className="flex-1"
+                >
+                  {isGeneratingLabel || loadingVariations ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Tag className="mr-2 h-4 w-4" />
+                  )}
+                  Etiquetas
+                </Button>
                 <PermissionGate permission="edit_product">
                   <Button 
                     variant="outline" 

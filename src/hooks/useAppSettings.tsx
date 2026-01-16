@@ -102,23 +102,23 @@ export const themePresets: ThemePreset[] = [
 ];
 
 const defaultSettings: AppSettings = {
-  storeName: "Flamenca Store",
+  storeName: "La Boutique Flamenca",
   primaryColor: "#dc2626",
   secondaryColor: "#1f2937",
   accentColor: "#f59e0b",
   selectedTheme: "flamenco-classic",
   language: "es",
-  storeAddress: "",
+  storeAddress: "Avenida de Alemania, 19, Local 21-22",
   storePhone: "",
   storeEmail: "",
-  storeWebsite: "",
+  storeWebsite: "https://laboutiqueflamenca.com",
   // Datos fiscales por defecto
-  cif: "",
-  companyName: "",
-  fiscalAddress: "",
-  postalCode: "",
-  city: "",
-  province: "",
+  cif: "B44793404",
+  companyName: "GRUPOFLEMISH SL",
+  fiscalAddress: "Avenida de Alemania, 19, Local 21-22",
+  postalCode: "41012",
+  city: "Sevilla",
+  province: "Sevilla",
   country: "España",
   bankName: "",
   bankAccount: "",
@@ -138,10 +138,31 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
-        setSettings({ ...defaultSettings, ...parsed });
+        // Asegurar que los datos de empresa siempre tengan valores por defecto si están vacíos
+        const mergedSettings = {
+          ...defaultSettings,
+          ...parsed,
+          // Forzar datos de empresa si están vacíos o no existen
+          storeName: parsed.storeName || defaultSettings.storeName,
+          storeAddress: parsed.storeAddress || defaultSettings.storeAddress,
+          storeWebsite: parsed.storeWebsite || defaultSettings.storeWebsite,
+          // Forzar datos fiscales si están vacíos o no existen
+          cif: parsed.cif || defaultSettings.cif,
+          companyName: parsed.companyName || defaultSettings.companyName,
+          fiscalAddress: parsed.fiscalAddress || defaultSettings.fiscalAddress,
+          postalCode: parsed.postalCode || defaultSettings.postalCode,
+          city: parsed.city || defaultSettings.city,
+          province: parsed.province || defaultSettings.province,
+          country: parsed.country || defaultSettings.country,
+          invoiceSeries: parsed.invoiceSeries || defaultSettings.invoiceSeries,
+        };
+        setSettings(mergedSettings);
       } catch (error) {
         console.error('Error parsing saved settings:', error);
+        setSettings(defaultSettings);
       }
+    } else {
+      setSettings(defaultSettings);
     }
     setIsLoading(false);
   }, []);

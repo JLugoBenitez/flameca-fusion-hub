@@ -212,8 +212,8 @@ export function useHoldedDocuments() {
       // Configuraciones por defecto (se pueden mejorar después)
       const settings = {
         primaryColor: '#dc2626',
-        companyName: 'Flamenco Fusion Hub',
-        storeName: 'Flamenco Fusion Hub',
+        companyName: 'GRUPOFLEMISH SL',
+        storeName: 'La Boutique Flamenca',
         cif: '',
         fiscalAddress: '',
         postalCode: '',
@@ -283,7 +283,7 @@ export function useHoldedDocuments() {
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text(settings.companyName || settings.storeName || 'Flamenco Fusion Hub', 20, yPos);
+      doc.text(settings.companyName || settings.storeName || 'La Boutique Flamenca', 20, yPos);
       yPos += 8;
       
       // CIF/NIF OBLIGATORIO

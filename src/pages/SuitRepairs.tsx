@@ -85,6 +85,7 @@ export default function SuitRepairs() {
     registration_date: new Date().toISOString(),
     delivery_date: "",
     price: "",
+    status: "Procesando",
   });
 
   useEffect(() => {
@@ -169,6 +170,7 @@ export default function SuitRepairs() {
         registration_date: repair.registration_date,
         delivery_date: repair.delivery_date || "",
         price: repair.price?.toString() || "",
+        status: repair.status || "Procesando",
       });
       await fetchRepairFiles(repair.id);
     } else {
@@ -186,6 +188,7 @@ export default function SuitRepairs() {
         registration_date: new Date().toISOString(),
         delivery_date: "",
         price: "",
+        status: "Procesando",
       });
     }
     setDialogOpen(true);
@@ -204,7 +207,7 @@ export default function SuitRepairs() {
         observations: formData.observations || null,
         registration_date: formData.registration_date,
         delivery_date: formData.delivery_date || null,
-        status: "Procesando", // Valor por defecto al crear
+        status: formData.status || "Procesando",
         price: formData.price ? parseFloat(formData.price) : 0,
         created_by: user?.id || null,
       };
@@ -296,6 +299,7 @@ export default function SuitRepairs() {
       registration_date: new Date().toISOString(),
       delivery_date: "",
       price: "",
+      status: "Procesando",
     });
   };
 
@@ -460,6 +464,25 @@ export default function SuitRepairs() {
                       placeholder="0.00"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="status">Estado *</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona el estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status.value} value={status.value}>
+                          {status.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

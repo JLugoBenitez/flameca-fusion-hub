@@ -110,6 +110,14 @@ serve(async (req) => {
         }
         break;
       
+      case 'get_variations':
+        if (!productId) throw new Error('Product ID required for get_variations');
+        const varPage = (params && typeof params === 'object' && 'page' in params) ? Number(params.page) || 1 : 1;
+        const varPerPage = (params && typeof params === 'object' && 'per_page' in params) ? Number(params.per_page) || 100 : 100;
+        endpoint = `/wp-json/wc/v3/products/${productId}/variations?page=${varPage}&per_page=${varPerPage}`;
+        console.log('🔄 Obteniendo variaciones:', { productId, varPage, varPerPage, endpoint });
+        break;
+      
       default:
         throw new Error('Invalid action');
     }

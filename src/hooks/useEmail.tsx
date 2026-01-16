@@ -371,7 +371,7 @@ export function useEmail() {
 
       const emailData: EmailData = {
         to: email,
-        subject: `Factura ${invoiceData.invoiceNumber} - Flamenco Fusion Hub`,
+        subject: `Factura ${invoiceData.invoiceNumber} - La Boutique Flamenca`,
         body: `
           <h2>Factura ${invoiceData.invoiceNumber}</h2>
           <p>Estimado/a ${invoiceData.customerName},</p>
@@ -383,7 +383,7 @@ export function useEmail() {
             <li>Total: ${invoiceData.total.toFixed(2)}€</li>
           </ul>
           <p>Gracias por su compra.</p>
-          <p>Saludos cordiales,<br>Flamenco Fusion Hub</p>
+          <p>Saludos cordiales,<br>La Boutique Flamenca</p>
         `,
         attachments
       };

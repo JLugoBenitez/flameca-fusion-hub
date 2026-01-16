@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, ClipboardList, Search, Loader2, Calendar, RefreshCw, Paperclip, Eye } from "lucide-react";
 import { PermissionGate } from "@/components/PermissionGate";
@@ -33,6 +34,11 @@ interface CustomOrder {
   files_count?: number;
 }
 
+const STATUS_OPTIONS = [
+  { value: "Procesando", label: "Procesando", color: "bg-blue-500" },
+  { value: "Completado", label: "Completado", color: "bg-green-500" },
+];
+
 export default function CustomOrders() {
   const { user } = useUserRole();
   const [orders, setOrders] = useState<CustomOrder[]>([]);
@@ -54,6 +60,7 @@ export default function CustomOrders() {
     observations: "",
     registration_date: new Date().toISOString(),
     delivery_date: "",
+    status: "Procesando",
   });
 
   useEffect(() => {
@@ -137,6 +144,7 @@ export default function CustomOrders() {
         observations: order.observations || "",
         registration_date: order.registration_date,
         delivery_date: order.delivery_date || "",
+        status: order.status || "Procesando",
       });
       await fetchOrderFiles(order.id);
     } else {
@@ -153,6 +161,7 @@ export default function CustomOrders() {
         observations: "",
         registration_date: new Date().toISOString(),
         delivery_date: "",
+        status: "Procesando",
       });
     }
     setDialogOpen(true);
@@ -171,7 +180,7 @@ export default function CustomOrders() {
         observations: formData.observations || null,
         registration_date: formData.registration_date,
         delivery_date: formData.delivery_date || null,
-        status: "Procesando", // Valor por defecto al crear
+        status: formData.status || "Procesando",
         created_by: user?.id || null,
       };
 
@@ -261,6 +270,7 @@ export default function CustomOrders() {
       observations: "",
       registration_date: new Date().toISOString(),
       delivery_date: "",
+      status: "Procesando",
     });
   };
 
@@ -273,6 +283,16 @@ export default function CustomOrders() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-ES');
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusOption = STATUS_OPTIONS.find(s => s.value === status);
+    if (!statusOption) return null;
+    return (
+      <Badge className={statusOption.color}>
+        {statusOption.label}
+      </Badge>
+    );
   };
 
   if (loading) {
@@ -385,6 +405,22 @@ export default function CustomOrders() {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="status">Estado *</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona el estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Procesando">Procesando</SelectItem>
+                      <SelectItem value="Completado">Completado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="registration_date">Fecha de Registro *</Label>
@@ -474,7 +510,10 @@ export default function CustomOrders() {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle className="text-xl">{order.order_number}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-xl">{order.order_number}</CardTitle>
+                      {getStatusBadge(order.status)}
+                    </div>
                     <div className="mt-1 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2 mt-2">
                         <Calendar className="h-4 w-4" />

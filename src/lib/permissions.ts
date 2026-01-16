@@ -1,5 +1,5 @@
 /**
- * Sistema de Permisos - Flamenca Store ERP
+ * Sistema de Permisos - La Boutique Flamenca ERP
  * 
  * ROLES:
  * - admin: Control total del sistema

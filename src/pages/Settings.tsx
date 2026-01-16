@@ -98,27 +98,53 @@ export default function Settings() {
 
   // Estados para cada sección
   const [storeSettings, setStoreSettings] = useState<StoreSettings>({
-    name: settings.storeName,
-    address: settings.storeAddress,
-    phone: settings.storePhone,
-    email: settings.storeEmail,
-    website: settings.storeWebsite,
+    name: "",
+    address: "",
+    phone: "",
+    email: "",
+    website: "",
     logo: ""
   });
 
   const [fiscalSettings, setFiscalSettings] = useState<FiscalSettings>({
-    cif: settings.cif || "",
-    companyName: settings.companyName || "",
-    fiscalAddress: settings.fiscalAddress || "",
-    postalCode: settings.postalCode || "",
-    city: settings.city || "",
-    province: settings.province || "",
-    country: settings.country || "España",
-    bankName: settings.bankName || "",
-    bankAccount: settings.bankAccount || "",
-    ivaRate: settings.ivaRate || 21,
-    invoiceSeries: settings.invoiceSeries || "A"
+    cif: "",
+    companyName: "",
+    fiscalAddress: "",
+    postalCode: "",
+    city: "",
+    province: "",
+    country: "España",
+    bankName: "",
+    bankAccount: "",
+    ivaRate: 21,
+    invoiceSeries: "A"
   });
+
+  // Cargar datos de la empresa y fiscales desde settings cuando estén disponibles
+  useEffect(() => {
+    setStoreSettings({
+      name: settings.storeName || "La Boutique Flamenca",
+      address: settings.storeAddress || "Avenida de Alemania, 19, Local 21-22",
+      phone: settings.storePhone || "",
+      email: settings.storeEmail || "",
+      website: settings.storeWebsite || "https://laboutiqueflamenca.com",
+      logo: ""
+    });
+
+    setFiscalSettings({
+      cif: settings.cif || "B44793404",
+      companyName: settings.companyName || "GRUPOFLEMISH SL",
+      fiscalAddress: settings.fiscalAddress || "Avenida de Alemania, 19, Local 21-22",
+      postalCode: settings.postalCode || "41012",
+      city: settings.city || "Sevilla",
+      province: settings.province || "Sevilla",
+      country: settings.country || "España",
+      bankName: settings.bankName || "",
+      bankAccount: settings.bankAccount || "",
+      ivaRate: settings.ivaRate || 21,
+      invoiceSeries: settings.invoiceSeries || "A"
+    });
+  }, [settings]);
 
   const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings>({
     theme: theme,
@@ -409,7 +435,7 @@ export default function Settings() {
                 Información de la Tienda
               </CardTitle>
               <CardDescription>
-                Configura la información básica de tu tienda
+                Información de la empresa (solo lectura)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -419,8 +445,9 @@ export default function Settings() {
                   <Input
                     id="store-name"
                     value={storeSettings.name}
-                    onChange={(e) => setStoreSettings(prev => ({ ...prev, name: e.target.value }))}
+                    disabled
                     placeholder="Mi Tienda Flamenca"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -428,8 +455,9 @@ export default function Settings() {
                   <Input
                     id="store-phone"
                     value={storeSettings.phone}
-                    onChange={(e) => setStoreSettings(prev => ({ ...prev, phone: e.target.value }))}
+                    disabled
                     placeholder="+34 666 123 456"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -438,8 +466,9 @@ export default function Settings() {
                     id="store-email"
                     type="email"
                     value={storeSettings.email}
-                    onChange={(e) => setStoreSettings(prev => ({ ...prev, email: e.target.value }))}
+                    disabled
                     placeholder="tienda@flamenca.com"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -447,8 +476,9 @@ export default function Settings() {
                   <Input
                     id="store-website"
                     value={storeSettings.website}
-                    onChange={(e) => setStoreSettings(prev => ({ ...prev, website: e.target.value }))}
+                    disabled
                     placeholder="https://www.flamenca.com"
+                    className="bg-muted"
                   />
                 </div>
               </div>
@@ -457,19 +487,12 @@ export default function Settings() {
                 <Textarea
                   id="store-address"
                   value={storeSettings.address}
-                  onChange={(e) => setStoreSettings(prev => ({ ...prev, address: e.target.value }))}
+                  disabled
                   placeholder="Calle Principal, 123, 41001 Sevilla"
                   rows={3}
+                  className="bg-muted"
                 />
               </div>
-              <Button 
-                onClick={saveStoreSettings}
-                disabled={saving}
-                className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                {saving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                Guardar Configuración
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -483,7 +506,7 @@ export default function Settings() {
                 Datos Fiscales
               </CardTitle>
               <CardDescription>
-                Configura la información fiscal de tu empresa para facturación
+                Información fiscal de la empresa (solo lectura)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -493,8 +516,9 @@ export default function Settings() {
                   <Input
                     id="cif"
                     value={fiscalSettings.cif}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, cif: e.target.value }))}
+                    disabled
                     placeholder="A12345678"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -502,8 +526,9 @@ export default function Settings() {
                   <Input
                     id="company-name"
                     value={fiscalSettings.companyName}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, companyName: e.target.value }))}
+                    disabled
                     placeholder="Mi Empresa SL"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -511,8 +536,9 @@ export default function Settings() {
                   <Input
                     id="invoice-series"
                     value={fiscalSettings.invoiceSeries}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, invoiceSeries: e.target.value }))}
+                    disabled
                     placeholder="A"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
@@ -520,9 +546,10 @@ export default function Settings() {
                   <Textarea
                     id="fiscal-address"
                     value={fiscalSettings.fiscalAddress}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, fiscalAddress: e.target.value }))}
+                    disabled
                     placeholder="Calle Principal, 123"
                     rows={2}
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -530,8 +557,9 @@ export default function Settings() {
                   <Input
                     id="postal-code"
                     value={fiscalSettings.postalCode}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, postalCode: e.target.value }))}
+                    disabled
                     placeholder="28001"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -539,8 +567,9 @@ export default function Settings() {
                   <Input
                     id="city"
                     value={fiscalSettings.city}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, city: e.target.value }))}
+                    disabled
                     placeholder="Madrid"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -548,8 +577,9 @@ export default function Settings() {
                   <Input
                     id="province"
                     value={fiscalSettings.province}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, province: e.target.value }))}
+                    disabled
                     placeholder="Madrid"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -557,8 +587,9 @@ export default function Settings() {
                   <Input
                     id="country"
                     value={fiscalSettings.country}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, country: e.target.value }))}
+                    disabled
                     placeholder="España"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -566,8 +597,9 @@ export default function Settings() {
                   <Input
                     id="bank-name"
                     value={fiscalSettings.bankName}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, bankName: e.target.value }))}
+                    disabled
                     placeholder="Banco Santander"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -575,8 +607,9 @@ export default function Settings() {
                   <Input
                     id="bank-account"
                     value={fiscalSettings.bankAccount}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, bankAccount: e.target.value }))}
+                    disabled
                     placeholder="ES12 1234 5678 9012 3456 7890"
+                    className="bg-muted"
                   />
                 </div>
                 <div className="space-y-2">
@@ -585,22 +618,13 @@ export default function Settings() {
                     id="iva-rate"
                     type="number"
                     value={fiscalSettings.ivaRate}
-                    onChange={(e) => setFiscalSettings(prev => ({ ...prev, ivaRate: parseFloat(e.target.value) || 21 }))}
+                    disabled
                     placeholder="21"
                     min="0"
                     max="100"
+                    className="bg-muted"
                   />
                 </div>
-              </div>
-              
-              <div className="flex justify-end">
-                <Button 
-                  onClick={() => handleSaveFiscalSettings()}
-                  disabled={saving}
-                >
-                  <Save className="mr-2 h-4 w-4" />
-                  {saving ? 'Guardando...' : 'Guardar Datos Fiscales'}
-                </Button>
               </div>
             </CardContent>
           </Card>

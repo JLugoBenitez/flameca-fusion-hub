@@ -11,6 +11,7 @@ export interface TicketData {
   total: number;
   paymentMethod: string;
   ticketNumber?: string;
+  receivedAmount?: number;
 }
 
 export function useTicketPDF() {
@@ -21,16 +22,14 @@ export function useTicketPDF() {
     setIsGenerating(true);
     
     try {
-      const doc = createTicketPDF(ticketData);
+      const doc = await createTicketPDF(ticketData);
       
-      // Si es preview, abrir en nueva ventana
       if (options?.preview) {
         const pdfBlob = doc.output('blob');
         const pdfUrl = URL.createObjectURL(pdfBlob);
         window.open(pdfUrl, '_blank');
         toast.success("Ticket generado. Revisa la ventana emergente.");
       } else {
-        // Descargar el PDF
         const ticketNumber = ticketData.ticketNumber || `TICKET-${Date.now()}`;
         doc.save(`ticket-${ticketNumber}.pdf`);
         toast.success("Ticket descargado correctamente");
@@ -43,164 +42,146 @@ export function useTicketPDF() {
     }
   };
 
-  const createTicketPDF = (ticketData: TicketData): jsPDF => {
-    // Crear PDF con formato estándar A4 y luego ajustar el ancho visualmente
-    // El ancho del ticket será de 80mm (226.77pt)
-    const ticketWidth = 226.77; // 80mm en puntos
-    const marginLeft = (595.28 - ticketWidth) / 2; // Centrar en A4 (ancho A4 = 595.28pt)
+  const createTicketPDF = async (ticketData: TicketData): Promise<jsPDF> => {
+    const ticketWidth = 80; 
     
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'pt',
-      format: 'a4' // Usar formato estándar
-    });
-    
-    // Establecer márgenes para simular el ancho del ticket
-    const startX = marginLeft;
-    
-    doc.setFont('helvetica');
-    let yPos = 20;
-    
-    // Encabezado
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(settings.storeName || 'TIENDA', startX + ticketWidth / 2, yPos, { align: 'center' });
-    yPos += 15;
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    if (settings.fiscalAddress) {
-      doc.text(settings.fiscalAddress, startX + ticketWidth / 2, yPos, { align: 'center' });
-      yPos += 10;
-    }
-    if (settings.postalCode && settings.city) {
-      doc.text(`${settings.postalCode} ${settings.city}`, startX + ticketWidth / 2, yPos, { align: 'center' });
-      yPos += 10;
-    }
-    if (settings.storePhone) {
-      doc.text(`Tel: ${settings.storePhone}`, startX + ticketWidth / 2, yPos, { align: 'center' });
-      yPos += 10;
-    }
-    if (settings.storeEmail) {
-      doc.text(settings.storeEmail, startX + ticketWidth / 2, yPos, { align: 'center' });
-      yPos += 10;
-    }
-    
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(startX + 10, yPos, startX + ticketWidth - 10, yPos);
-    yPos += 10;
-    
-    // Fecha y hora
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    
-    doc.setFontSize(8);
-    doc.text(`Fecha: ${dateStr}`, startX + 15, yPos);
-    doc.text(`Hora: ${timeStr}`, startX + ticketWidth - 15, yPos, { align: 'right' });
-    yPos += 12;
-    
-    if (ticketData.ticketNumber) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.text(`Ticket #${ticketData.ticketNumber}`, startX + ticketWidth / 2, yPos, { align: 'center' });
-      yPos += 10;
-    }
-    
-    doc.line(startX + 10, yPos, startX + ticketWidth - 10, yPos);
-    yPos += 10;
-    
-    // Productos
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PRODUCTOS', startX + 15, yPos);
-    yPos += 12;
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    
-    ticketData.items.forEach((item) => {
-      const productName = item.product_name || 'Producto';
-      const nameLines = doc.splitTextToSize(productName, ticketWidth - 100);
-      nameLines.forEach((line: string, index: number) => {
-        doc.text(line, startX + 15, yPos);
-        if (index === 0) {
-          doc.text(`${item.quantity}x`, startX + ticketWidth - 80, yPos, { align: 'right' });
-          doc.text(`${item.subtotal.toFixed(2)}€`, startX + ticketWidth - 15, yPos, { align: 'right' });
-        }
-        yPos += 10;
+    // Función interna para dibujar el contenido y medir la altura real
+    const drawContent = async (pdfDoc: jsPDF) => {
+      const centerX = ticketWidth / 2;
+      let y = 10;
+
+      // --- LOGO ---
+      try {
+        const logoImg = "/logo.png";
+        const img = new Image();
+        img.src = logoImg;
+        await new Promise((resolve) => {
+          img.onload = () => {
+            const logoWidth = 25;
+            const logoHeight = (img.height * logoWidth) / img.width;
+            pdfDoc.addImage(img, 'PNG', centerX - (logoWidth / 2), y, logoWidth, logoHeight);
+            y += logoHeight + 2;
+            resolve(null);
+          };
+          img.onerror = () => {
+            pdfDoc.setFont('courier', 'bold');
+            pdfDoc.setFontSize(22);
+            pdfDoc.text('L B F', centerX, y, { align: 'center' });
+            y += 8;
+            resolve(null);
+          };
+        });
+      } catch (e) {
+        y += 5;
+      }
+      
+      // --- ENCABEZADO FISCAL ---
+      pdfDoc.setFont('courier', 'normal');
+      const separator = "******************************************";
+      pdfDoc.setFontSize(7);
+      pdfDoc.text(separator, centerX, y, { align: 'center' });
+      y += 4;
+      
+      pdfDoc.text(settings.storeName?.toUpperCase() || 'LA BOUTIQUE FLAMENCA', 5, y); y += 4;
+      pdfDoc.text(settings.fiscalAddress?.toUpperCase() || 'CALLE GUADALBULLON LOCAL 7', 5, y); y += 4;
+      pdfDoc.text(`${settings.postalCode || '41013'} ${settings.city?.toUpperCase() || 'SEVILLA'}    Tlf: ${settings.storePhone || '633221324'}`, 5, y); y += 4;
+      pdfDoc.text(`NIF: ${settings.nif || 'B44793404'}`, 5, y); y += 4;
+      
+      pdfDoc.text(separator, centerX, y, { align: 'center' });
+      y += 4;
+      
+      // Info de venta (SIN CLIENTE NI DEPENDIENTE)
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('es-ES');
+      const timeStr = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      
+      pdfDoc.text(`N. Fac. Simplificada: ${ticketData.ticketNumber || 'FS24 - 8'}`, 5, y); y += 4;
+      pdfDoc.text(`Fecha: ${dateStr}   Hora: ${timeStr}`, 5, y); y += 6;
+      
+      // --- TABLA DE PRODUCTOS ---
+      pdfDoc.text('------------------------------------------', centerX, y, { align: 'center' });
+      y += 3;
+      pdfDoc.text('Ct. Descripcion          Precio Importe', 5, y);
+      y += 3;
+      pdfDoc.text('------------------------------------------', centerX, y, { align: 'center' });
+      y += 5;
+      
+      ticketData.items.forEach((item: any) => {
+        const name = (item.name || item.product_name || 'ARTICULO').substring(0, 18).toUpperCase();
+        const unitPrice = parseFloat(item.price || item.unit_price || 0);
+        const quantity = item.quantity || 1;
+        const subtotalItem = unitPrice * quantity;
+
+        const qtyStr = quantity.toFixed(2).replace('.', ',');
+        const priceStr = unitPrice.toFixed(2).replace('.', ',');
+        const totalItemStr = subtotalItem.toFixed(2).replace('.', ',');
+        
+        pdfDoc.text(`${qtyStr} ${name}`, 5, y);
+        pdfDoc.text(priceStr, 55, y, { align: 'right' });
+        pdfDoc.text(totalItemStr, 75, y, { align: 'right' });
+        y += 5;
       });
-      if (nameLines.length > 1) yPos += 2;
-    });
+      
+      y += 2;
+      pdfDoc.setFont('courier', 'bold');
+      pdfDoc.text(`TOTAL:   ${ticketData.total.toFixed(2).replace('.', ',')}`, 75, y, { align: 'right' });
+      y += 8;
+      
+      // --- PAGOS ---
+      pdfDoc.setFont('courier', 'normal');
+      const entrega = ticketData.receivedAmount || ticketData.total;
+      const cambio = (entrega - ticketData.total) > 0 ? (entrega - ticketData.total) : 0;
+      
+      pdfDoc.text(`Entrega:     ${entrega.toFixed(2).replace('.', ',')}`, 55, y, { align: 'right' }); y += 4;
+      pdfDoc.text(`Devolucion:      ${cambio.toFixed(2).replace('.', ',')}`, 55, y, { align: 'right' }); y += 4;
+      pdfDoc.text(`Forma de pago: ${ticketData.paymentMethod.toUpperCase()}`, 5, y); y += 8;
+      
+      // --- DESGLOSE IVA ---
+      const base = (ticketData.total / 1.21);
+      const ivaValue = ticketData.total - base;
+      
+      pdfDoc.text('   BASE    %IVA  IVA', 5, y); y += 4;
+      pdfDoc.text(`${base.toFixed(2).padStart(8).replace('.', ',')}    21  ${ivaValue.toFixed(2).replace('.', ',')}`, 5, y); y += 8;
+      
+      pdfDoc.setFontSize(8);
+      pdfDoc.text('IVA INCLUIDO', centerX, y, { align: 'center' }); y += 5;
+      pdfDoc.text('GRACIAS POR SU COMPRA.', centerX, y, { align: 'center' }); y += 8;
+      
+      // --- POLÍTICA DE DEVOLUCIONES ---
+      pdfDoc.setFontSize(6.5);
+      const policy = [
+        "NO SE ADMITE DEVOLUCIONES.",
+        "ESTE TICKET ES NECESARIO PARA",
+        "CAMBIOS EN UN PLAZO DE 7 DIAS.",
+        "LOS ARTICULOS DEBERAN ESTAR EN",
+        "PERFECTO ESTADO CON TODOS SUS",
+        "ACCESORIOS Y DENTRO DE SU EMBALAJE",
+        "ORIGINAL."
+      ];
+      
+      policy.forEach(line => {
+        pdfDoc.text(line, 5, y);
+        y += 3.5;
+      });
+
+      return y + 5; // Retornamos altura final real
+    };
+
+    // Paso 1: Medir contenido
+    const tempDoc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [ticketWidth, 300] });
+    const finalHeight = await drawContent(tempDoc);
     
-    yPos += 5;
-    doc.line(startX + 10, yPos, startX + ticketWidth - 10, yPos);
-    yPos += 10;
+    // Paso 2: Crear PDF con altura exacta
+    const finalDoc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [ticketWidth, finalHeight] });
+    await drawContent(finalDoc);
     
-    // Totales
-    const subtotalSinIVA = ticketData.subtotal / 1.21;
-    doc.setFontSize(8);
-    doc.text('Subtotal (sin IVA):', startX + 15, yPos);
-    doc.text(`${subtotalSinIVA.toFixed(2)}€`, startX + ticketWidth - 15, yPos, { align: 'right' });
-    yPos += 10;
-    
-    const iva = ticketData.subtotal - subtotalSinIVA;
-    doc.text(`IVA (${settings.ivaRate || 21}%):`, startX + 15, yPos);
-    doc.text(`${iva.toFixed(2)}€`, startX + ticketWidth - 15, yPos, { align: 'right' });
-    yPos += 10;
-    
-    doc.text('Subtotal (con IVA):', startX + 15, yPos);
-    doc.text(`${ticketData.subtotal.toFixed(2)}€`, startX + ticketWidth - 15, yPos, { align: 'right' });
-    yPos += 10;
-    
-    if (ticketData.discount > 0) {
-      doc.setFont('helvetica', 'italic');
-      doc.text('Descuento:', startX + 15, yPos);
-      doc.text(`-${ticketData.discount.toFixed(2)}€`, startX + ticketWidth - 15, yPos, { align: 'right' });
-      yPos += 10;
-    }
-    
-    doc.line(startX + 10, yPos, startX + ticketWidth - 10, yPos);
-    yPos += 10;
-    
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('TOTAL:', startX + 15, yPos);
-    doc.text(`${ticketData.total.toFixed(2)}€`, startX + ticketWidth - 15, yPos, { align: 'right' });
-    yPos += 15;
-    
-    // Método de pago
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Método de pago:', startX + 15, yPos);
-    yPos += 10;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(ticketData.paymentMethod, startX + 15, yPos);
-    yPos += 15;
-    
-    doc.line(startX + 10, yPos, startX + ticketWidth - 10, yPos);
-    yPos += 10;
-    
-    // Pie de página
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'italic');
-    doc.text('Gracias por su compra', startX + ticketWidth / 2, yPos, { align: 'center' });
-    yPos += 8;
-    
-    if (settings.storeWebsite) {
-      doc.text(settings.storeWebsite, startX + ticketWidth / 2, yPos, { align: 'center' });
-    }
-    
-    return doc;
+    return finalDoc;
   };
 
   const printTicket = async (ticketData: TicketData) => {
     setIsGenerating(true);
-    
     try {
-      const doc = createTicketPDF(ticketData);
+      const doc = await createTicketPDF(ticketData);
       const pdfBlob = doc.output('blob');
       const pdfUrl = URL.createObjectURL(pdfBlob);
       const printWindow = window.open(pdfUrl, '_blank');
@@ -213,18 +194,14 @@ export function useTicketPDF() {
           }, 250);
         };
       } else {
-        toast.error("No se pudo abrir la ventana de impresión. Por favor, permite ventanas emergentes.");
+        toast.error("No se pudo abrir la ventana de impresión.");
       }
     } catch (error: any) {
-      toast.error("Error al imprimir ticket: " + (error.message || "Error desconocido"));
+      toast.error("Error al imprimir ticket: " + error.message);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  return {
-    generateTicket,
-    printTicket,
-    isGenerating
-  };
+  return { generateTicket, printTicket, isGenerating };
 }

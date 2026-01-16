@@ -87,7 +87,7 @@ export default function Auth() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-primary/80 to-primary-dark/60 flex items-center justify-center">
           <div className="text-center text-primary-foreground px-8">
-            <h1 className="text-5xl font-bold mb-4">Flamenca Store</h1>
+            <h1 className="text-5xl font-bold mb-4">La Boutique Flamenca</h1>
             <p className="text-xl opacity-90">Gestión integral para tu tienda de trajes de flamenca</p>
           </div>
         </div>
