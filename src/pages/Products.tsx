@@ -236,20 +236,15 @@ export default function Products() {
     try {
       // Verificar si el producto tiene variaciones
       const hasVariations = product.variations && Array.isArray(product.variations) && product.variations.length > 0;
-      
+
       if (hasVariations) {
         // Obtener todas las variaciones
-        toast.loading("Obteniendo variaciones del producto...");
         const variations = await fetchVariations(product.woocommerce_id || product.id);
         
         if (variations.length === 0) {
-          toast.dismiss();
           toast.error("No se encontraron variaciones para este producto");
           return;
         }
-        
-        toast.dismiss();
-        toast.loading(`Generando ${variations.length} etiquetas...`);
         
         // Generar etiqueta para cada variación
         const labelsData = variations.map(variation => ({
@@ -259,15 +254,12 @@ export default function Products() {
         }));
         
         await generateMultipleLabels(labelsData);
-        toast.dismiss();
       } else {
         // Producto sin variaciones - generar una sola etiqueta
-        toast.loading("Generando etiqueta...");
         await generateLabel({
           product,
           barcode: `PROD-${product.woocommerce_id || product.id}`
         });
-        toast.dismiss();
       }
     } catch (error: any) {
       toast.error("Error al generar etiquetas: " + (error.message || "Error desconocido"));

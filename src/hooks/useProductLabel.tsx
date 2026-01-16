@@ -41,7 +41,7 @@ export function useProductLabel() {
         const fileName = `etiqueta-${labelData.barcode}.pdf`;
         doc.save(fileName);
       }
-      toast.success("Etiqueta generada");
+      // Toast eliminado - la etiqueta se genera correctamente sin notificación
     } catch (error: any) {
       toast.error("Error: " + (error.message || "Error desconocido"));
     } finally {
@@ -75,7 +75,7 @@ export function useProductLabel() {
       } else {
         doc.save(`etiquetas-${Date.now()}.pdf`);
       }
-      toast.success(`${labelsData.length} etiquetas generadas`);
+      // Toast eliminado - las etiquetas se generan correctamente sin notificación
     } catch (error: any) {
       toast.error("Error al generar: " + error.message);
     } finally {
