@@ -148,6 +148,7 @@ export interface DashboardStats {
   employees: number;
   todaySales: number;
   weekSales: number;
+  pendingRepairs?: number;
 }
 
 export interface Employee {

@@ -18,6 +18,7 @@ export default function Dashboard() {
     employees: 0,
     todaySales: 0,
     weekSales: 0,
+    pendingRepairs: 0, // Arreglos pendientes
   });
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
@@ -143,7 +144,7 @@ export default function Dashboard() {
       }
 
       // Obtener estadísticas básicas
-      const [productsResponse, allOrders, employees] = await Promise.all([
+      const [productsResponse, allOrders, employees, repairsResponse] = await Promise.all([
         supabase.functions.invoke('sync-woocommerce-products', {
           body: { 
             action: 'list',
@@ -152,46 +153,59 @@ export default function Dashboard() {
         }),
         supabase.from("orders").select("*"),
         supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.from("suit_repairs").select("*", { count: "exact", head: true }).eq("status", "Procesando"),
       ]);
 
       const ordersData = allOrders.data || [];
-      console.log("Orders data:", ordersData);
-      console.log("Orders count:", ordersData.length);
+      const pendingRepairsCount = repairsResponse.count || 0;
       
       const pendingOrders = ordersData.filter(o => 
         o.status === 'pending'
       );
-      console.log("Pending orders:", pendingOrders.length);
-      
-      // Log para verificar pedidos con pago aceptado
-      const paidOrders = ordersData.filter(o => o.payment_status === 'paid');
-      console.log("Paid orders:", paidOrders.length);
-      console.log("Paid orders today:", ordersData.filter(o => {
-        const orderDate = new Date(o.created_at);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return orderDate >= today && o.payment_status === 'paid';
-      }).length);
 
-      // Calcular ventas de hoy (solo pedidos con pago aceptado)
+      // Calcular ventas desde los pedidos de la base de datos (OPCIÓN PRINCIPAL)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todaySales = ordersData
-        .filter(o => {
-          const orderDate = new Date(o.created_at);
-          return orderDate >= today && o.payment_status === 'paid';
-        })
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
-
-      // Calcular ventas de la semana (solo pedidos con pago aceptado)
+      
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
+      weekAgo.setHours(0, 0, 0, 0);
+      
+      // Calcular ventas de hoy desde la BD
+      // Considerar pedidos completados o con payment_status paid, o simplemente todos los pedidos de hoy
+      const todaySales = ordersData
+        .filter(o => {
+          if (!o.created_at) return false;
+          const orderDate = new Date(o.created_at);
+          const isToday = orderDate >= today;
+          
+          // Considerar venta si:
+          // - Está completado, O
+          // - Tiene payment_status paid, O  
+          // - Tiene total_amount > 0 (venta válida)
+          const isCompleted = o.status === 'completed';
+          const isPaid = o.payment_status === 'paid';
+          const hasAmount = Number(o.total_amount || 0) > 0;
+          
+          return isToday && hasAmount && (isCompleted || isPaid || o.status !== 'cancelled');
+        })
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+
+      // Calcular ventas de la semana desde la BD
       const weekSales = ordersData
         .filter(o => {
+          if (!o.created_at) return false;
           const orderDate = new Date(o.created_at);
-          return orderDate >= weekAgo && o.payment_status === 'paid';
+          const isThisWeek = orderDate >= weekAgo;
+          
+          // Mismos criterios que para hoy
+          const isCompleted = o.status === 'completed';
+          const isPaid = o.payment_status === 'paid';
+          const hasAmount = Number(o.total_amount || 0) > 0;
+          
+          return isThisWeek && hasAmount && (isCompleted || isPaid || o.status !== 'cancelled');
         })
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
+        .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
       // Transformar productos de WooCommerce
       const products = productsResponse.data?.data || [];
@@ -212,6 +226,7 @@ export default function Dashboard() {
         employees: employees.count || 0,
         todaySales,
         weekSales,
+        pendingRepairs: pendingRepairsCount,
       });
 
       // Productos con stock bajo
@@ -374,14 +389,14 @@ export default function Dashboard() {
 
         <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
+            <CardTitle className="text-sm font-medium">Arreglos Pendientes</CardTitle>
             <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600">
-              <Package className="h-4 w-4 text-white" />
+              <AlertCircle className="h-4 w-4 text-white" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{stats.products}</div>
-            <p className="text-xs text-muted-foreground mt-1">En catálogo</p>
+            <div className="text-3xl font-bold text-purple-600">{stats.pendingRepairs || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">En proceso</p>
           </CardContent>
         </Card>
       </div>
